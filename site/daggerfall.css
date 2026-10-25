@@ -259,3 +259,11 @@ code { color: var(--gold); }
 .dg-town-mark { margin-top: 10px; }
 .dg-town-head:empty { display: none; }
 .dg-town-head .dg-card-trip, .dg-town-head .dg-card-trip * { color: var(--ink); }
+/* Towns & dungeons: the dungeon map */
+.dg-dungeon { margin: 10px 0; }
+.dg-dungeon-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+.dg-level { flex: 1 1 220px; min-height: 44px; }
+.dg-dungeon-controls .tool-btn { min-width: 44px; min-height: 44px; }
+.dg-dungeon-wrap { border: 3px solid var(--stone-lo); box-shadow: 0 0 0 2px var(--stone-hi); touch-action: none; }
+.dg-dungeon-map { display: block; cursor: grab; }
+.dg-town-cols[hidden], .dg-dungeon[hidden] { display: none; }

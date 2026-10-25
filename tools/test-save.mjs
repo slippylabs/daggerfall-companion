@@ -37,6 +37,9 @@ for (const [kind, bytes] of Object.entries(files)) {
   const old = questsInSave(saves[1].snap, quests).found.find(f => f.q.file === 'M0B00Y00');
   check(old?.locs._mondung_ === idx('Ruins of Wickston Manor') && old?.daysLeft === 5 && old?.names._questgiver_?.[1] === 'Lord Kain Mastercroft',
     `[${kind}] older save: the hunt's dungeon by map id, 5 days, the quest giver's name`);
+  const spot = old?.spots?._mondung_?.[0];
+  check(old?.spots?._mondung_?.length === 1 && spot.what[0] === '_werewolf_' && Number.isInteger(spot.bx) && spot.y !== undefined,
+    `[${kind}] the werewolf's spot inside the dungeon: block ${spot?.bx},${spot?.bz} at ${spot?.x},${spot?.y},${spot?.z}`);
 }
 let bad = false;
 try { await readSaves(new Blob(['hello'])); } catch { bad = true; }

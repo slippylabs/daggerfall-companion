@@ -1,7 +1,8 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=8';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=8';
-import { state } from './state.js?v=8';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=9';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=9';
+import { state } from './state.js?v=9';
+import { showDungeon, dungeonBlocks } from './dungeon.js?v=9';
 
 const $ = id => document.getElementById(id);
 const canvas = $('town-canvas'), ctx = canvas.getContext('2d');
@@ -55,7 +56,8 @@ function whereInTown(town, p) {
   return `in the ${part} part of town, about ${Math.round(m / 10) * 10} m from the middle`;
 }
 
-// opts.key: a quest building's key from a save (a house has no name on any map until the quest names it)
+// opts.key: a quest building's key from a save (a house has no name on any map until the quest names it);
+// opts.targets: quest spots inside a dungeon from a save, [{bx, bz, x, y, z, label}]
 export async function openTown(i, buildingName = null, opts = {}) {
   if (state.tab !== 'towns') tabs?.show('towns');
   loading = i;
@@ -78,7 +80,13 @@ export async function openTown(i, buildingName = null, opts = {}) {
       el('div', { class: 'dg-reward-who', text: buildingName }),
       el('div', {}, `It stands ${whereInTown(current.town, mark)} (circled on the map, north is up).`)) : null,
     opts.key && !mark && current.town ? el('p', { class: 'tool-note', text: `${buildingName}: this building is not on the guide's map of ${data.locs.name[i]}. Ask townspeople "Where is…" in the talk window.` }) : null,
-    current.town ? null : el('p', { class: 'tool-note', text: 'This place has no buildings on its map (a dungeon or an empty spot).' }));
+    current.town || (await dungeonBlocks(i)) ? null : el('p', { class: 'tool-note', text: 'This place has no buildings and no dungeon on its map.' }));
+  if (current.i !== i) return;   // a later pick won while the dungeon list loaded
+  $('town-cols').hidden = !current.town;
+  const dv = $('dungeon-view');
+  dv.hidden = !(await dungeonBlocks(i));
+  if (!dv.hidden) await showDungeon(dv, i, opts.targets || []);
+  else fill(dv);
   renderList();
   drawMap();
 }

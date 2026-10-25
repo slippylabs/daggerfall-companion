@@ -34,6 +34,17 @@ const quest = (uid, questName, displayName, resources) => ({
   messages: [], resources, questors: [], tasks: [], oneTimeDisplayedMessages: [],
 });
 
+// Hunt for a Lycanthrope's beast stands on a real quest-spawn marker of Ruins of Wickston Manor: the first block
+// of the dungeon that has one (data/dungeons + data/rdb/index.json, from build-dungeons.mjs)
+const wIdx = L.name.indexOf('Ruins of Wickston Manor');
+const wBlocks = JSON.parse(readFileSync(join(SITE, `data/dungeons/r${String(L.region[wIdx]).padStart(2, '0')}.json`), 'utf8'))[wIdx];
+const rdbIndex = JSON.parse(readFileSync(join(SITE, 'data/rdb/index.json'), 'utf8'));
+const lair = wBlocks.find(b => !b[3] && rdbIndex[b[2]].quest.length);
+const [mx, my, mz] = rdbIndex[lair[2]].quest[0];
+export const FIXTURE_LAIR = { bx: lair[0], bz: lair[1], x: mx, y: my, z: mz };
+const marker = (targets) => ({ questUID: 102, placeSymbol: { original: '_mondung_', name: 'mondung' }, targetResources: targets,
+  markerType: 0, flatPosition: { x: mx, y: my, z: mz }, dungeonX: lair[0], dungeonZ: lair[1], buildingKey: 0, markerID: 1 });
+
 const delivery = quest(101, 'A0C00Y14', 'The Delivery Boy', [
   person('_questgiver_', 'Gondywyr Hearthhouse', '_questgiver_home_'),
   place('_questgiver_home_', site(DAGGERFALL, 'Daggerfall', 'The Yeoming Residence', 2, 328197)),
@@ -44,7 +55,8 @@ const delivery = quest(101, 'A0C00Y14', 'The Delivery Boy', [
 const hunt = quest(102, 'M0B00Y00', 'Hunt for a Lycanthrope', [
   person('_questgiver_', 'Lord Kain Mastercroft', '_questgiver_home_'),
   place('_questgiver_home_', site(DAGGERFALL, 'Daggerfall', 'The Fighters Guild', 2, 197899)),
-  place('_mondung_', site(WICKSTON, 'Ruins of Wickston Manor', null, 1)),
+  place('_mondung_', { ...site(WICKSTON, 'Ruins of Wickston Manor', null, 1),
+    selectedMarker: marker([{ original: '_werewolf_', name: 'werewolf' }]), questSpawnMarkers: [marker(null)] }),
   clock('_1stparton_', 5),
 ]);
 const snap = (quests, pixel, minutes) => JSON.stringify({ v: 1, classicMinutes: minutes, locationKey: pixel ? 'world' : null,
@@ -60,4 +72,4 @@ const keys = [...store.keys()];
 const storage = { get length() { return keys.length; }, key: i => keys[i], getItem: k => store.get(k) ?? null };
 const zip = exportSavesZip(storage);
 writeFileSync(join(ROOT, 'tools/fixtures/DFO-Online-Saves.zip'), zip);
-console.log(`fixture zip ${zip.length} bytes`);
+console.log(`fixture zip ${zip.length} bytes; the werewolf at block ${lair[0]},${lair[1]} (${lair[2]}) ${mx},${my},${mz}`);

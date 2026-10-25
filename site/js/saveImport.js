@@ -3,7 +3,7 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=8';
+import { data } from './data.js?v=9';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -90,7 +90,7 @@ export function questsInSave(snap, quests) {
     const key = sym => sym && (q.resources[sym] ? sym : q.resources[`_${String(sym).replace(/^_+|_+$/g, '')}_`] ? `_${String(sym).replace(/^_+|_+$/g, '')}_` : null);
     const res = new Map((sq.resources || []).map(r => [r.symbol?.original, r]));
     const site = sym => res.get(sym)?.resourceSpecific?.siteDetails || null;
-    const names = {}, days = {}, locs = {}, buildings = {};
+    const names = {}, days = {}, locs = {}, buildings = {}, spots = {};
     // the blanks as the game fills them: a person _name_ __building_ ___town_ ____region_ (Person.expandMacro);
     // a place _building_ __town_ ___town_ ____region_ (Place.expandMacro)
     const put = (k, sd, n) => {
@@ -108,7 +108,24 @@ export function questsInSave(snap, quests) {
     for (const [orig, r] of res) {
       const k = key(orig), rs = r.resourceSpecific || {};
       if (!k) continue;
-      if (r.type === 'Place') { const sd = rs.siteDetails; put(k, sd, { 1: sd?.buildingName, 2: sd?.locationName }); }
+      if (r.type === 'Place') {
+        const sd = rs.siteDetails;
+        put(k, sd, { 1: sd?.buildingName, 2: sd?.locationName });
+        // inside a dungeon: the markers the quest stood its people, foes and items on (Place.cs marker
+        // assignment); positions are block-local, the block is (dungeonX, dungeonZ)
+        if (locs[k] !== undefined && !sd.buildingKey) {
+          const seen = new Set(), list = [];
+          for (const m of [sd.selectedMarker, ...(sd.questSpawnMarkers || []), ...(sd.questItemMarkers || [])]) {
+            if (!m?.targetResources?.length || !m.flatPosition) continue;
+            const id = `${m.dungeonX},${m.dungeonZ},${m.flatPosition.x},${m.flatPosition.z}`;
+            if (seen.has(id)) continue;
+            seen.add(id);
+            list.push({ bx: m.dungeonX, bz: m.dungeonZ, ...m.flatPosition,
+              what: m.targetResources.map(t => key(t?.original ?? (t?.name ? `_${t.name}_` : null))).filter(Boolean) });
+          }
+          if (list.length) spots[k] = list;
+        }
+      }
       else if (r.type === 'Person') {
         const sd = site(rs.lastAssignedPlaceSymbol?.original) || site(rs.homePlaceSymbol?.original);
         put(k, sd, { 1: rs.displayName, 2: sd?.buildingName });
@@ -119,7 +136,7 @@ export function questsInSave(snap, quests) {
     }
     // days left: the quest's own timer, else the tightest running clock
     const daysLeft = clocks[q.timer] ?? (Object.keys(clocks).length ? Math.min(...Object.values(clocks)) : null);
-    out.push({ q, names, days, daysLeft, locs, buildings, uid: sq.uid });
+    out.push({ q, names, days, daysLeft, locs, buildings, spots, uid: sq.uid });
   }
   return { found: out, unknown };
 }

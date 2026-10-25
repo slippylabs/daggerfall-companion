@@ -147,6 +147,15 @@ def run(base, width, height, mobile):
         page.wait_for_timeout(300)
         check('The Mages Guild' in page.inner_text('#town-buildings'), f'[{tag}] building search finds The Mages Guild')
         page.screenshot(path=str(SHOTS / f'towns_{tag}.png'), full_page=True)
+        page.fill('#town-input', 'Ruins of Wickston Manor')
+        page.wait_for_selector('#town-suggest li')
+        page.click('#town-suggest li >> nth=0')
+        page.wait_for_selector('#dungeon-view canvas')
+        check(not page.is_hidden('#dungeon-view') and 'top to bottom' in page.inner_text('#dungeon-view'), f'[{tag}] any dungeon opens as a map in Towns & dungeons')
+        page.fill('#town-input', 'Daggerfall')
+        page.wait_for_selector('#town-suggest li')
+        page.click('#town-suggest li >> nth=0')
+        page.wait_for_function('!document.querySelector("#town-cols").hidden')
 
         # My quests: both saved quests, with who pays and the trips
         page.click('.hud-tab[data-tab="mine"]')
@@ -218,6 +227,16 @@ def run(base, width, height, mobile):
         page.wait_for_selector('#mine-list .dg-save-pick')
         page.locator('#mine-list .dg-save-pick').nth(1).click()
         page.wait_for_selector('#mine-list .dg-import-msg b')
+        # Where in the dungeon: the werewolf's spot from the save, on the dungeon map
+        page.click('#mine-list .dg-find-dungeon')
+        page.wait_for_selector('#dungeon-view .dg-town-mark')
+        spot = page.inner_text('#dungeon-view .dg-town-mark')
+        check('of the entrance' in spot and page.locator('#dungeon-view canvas').count() == 1 and page.is_hidden('#town-cols'),
+              f'[{tag}] dungeon map: the quest target is pinned with directions ({spot.splitlines()[1][:80]})')
+        check('quest target' in page.inner_text('#dungeon-view .dg-level'), f'[{tag}] dungeon map: the level picker opens on the target level')
+        page.screenshot(path=str(SHOTS / f'dungeon_{tag}.png'), full_page=True)
+        page.click('.hud-tab[data-tab="mine"]')
+        page.wait_for_selector('#mine-list .dg-mine')
         check(page.locator('#mine-list .dg-mine').count() == 2 and 'Lord Kain Mastercroft in Daggerfall' in page.inner_text('#mine-list')
               and page.locator('#mine-list .dg-mine-done').count() == 1,
               f'[{tag}] the older save fills in the hunt (giver by name, ticks kept) without doubling the delivery')

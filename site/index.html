@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=UnifrakturMaguntia&display=swap">
 <link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="daggerfall.css?v=9">
+<link rel="stylesheet" href="daggerfall.css?v=12">
 <script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
 (function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
 </head>
@@ -80,7 +80,7 @@
       <button class="hud-tab" role="tab" data-tab="journal">Journal</button>
       <button class="hud-tab" role="tab" data-tab="map">Map &amp; search</button>
       <button class="hud-tab" role="tab" data-tab="quests">Quests</button>
-      <button class="hud-tab" role="tab" data-tab="towns">Towns</button>
+      <button class="hud-tab" role="tab" data-tab="towns">Towns &amp; dungeons</button>
       <button class="hud-tab" role="tab" data-tab="mine">My quests</button>
     </nav>
 
@@ -137,13 +137,14 @@
     <section id="tab-towns" class="dg-tab" role="tabpanel" hidden>
       <div class="dg-search-row">
         <div class="dg-combo dg-grow">
-          <input id="town-input" class="tool-text-input" type="text" autocomplete="off" placeholder="Town, e.g. Daggerfall" aria-controls="town-suggest">
+          <input id="town-input" class="tool-text-input" type="text" autocomplete="off" placeholder="Town or dungeon, e.g. Daggerfall" aria-controls="town-suggest">
           <ul id="town-suggest" class="dg-suggest" role="listbox" hidden></ul>
         </div>
         <input id="building-search" class="tool-text-input dg-grow" type="search" autocomplete="off" placeholder="Find a building, e.g. Fighters Guild">
       </div>
       <div id="town-head" class="dg-town-head dg-card"></div>
-      <div class="two-col dg-town-cols">
+      <div id="dungeon-view" class="dg-dungeon" hidden></div>
+      <div id="town-cols" class="two-col dg-town-cols">
         <div class="dg-town-map-wrap"><canvas id="town-canvas" class="dg-town-map" width="400" height="400"></canvas></div>
         <div id="town-buildings" class="dg-buildings"></div>
       </div>
@@ -168,7 +169,7 @@
   </div>
 </main>
 
-<script type="module" src="js/app.js?v=8"></script>
+<script type="module" src="js/app.js?v=9"></script>
 <!-- Slippy Deck: floating Slippy TV + jukebox player. Renders nothing unless admin.slippylabs.com/whoami confirms a signed-in account. -->
 <script defer src="https://slippylabs.com/deck/deck.js"></script>
 <!-- Slippy Labs sitewide privacy link. Self-contained on purpose: these sites

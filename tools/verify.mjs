@@ -72,6 +72,28 @@ for (const name of ['Daggerfall', 'Ruins of Wickston Manor', 'The Fortress of Ma
   check(city.b.some(r => r[0] === 'The Bank of the Empire' && r[9] === 'The Bank of Daggerfall'), 'banks use DFO Online naming (Bank of the Empire)');
 }
 
+// 4b. Dungeon floors: the game's own entrance and quest markers stand on a floor at their height (98% as built;
+// a mirrored map puts only ~57% there, so this pins the orientation and the height bands)
+{
+  const idx = load('data/rdb/index.json');
+  let n = 0, ok = 0;
+  for (const [name, b] of Object.entries(idx)) {
+    const g = new Uint16Array(readFileSync(join(SITE, `data/rdb/${name}.bin`)).buffer.slice(0));
+    for (const [x, y, z] of [...b.start, ...b.quest]) {
+      n++;
+      const px = Math.floor(x / 51.2 * 128), py = Math.floor((1 - z / 51.2) * 128), band = Math.floor(y / 3.2);
+      let hit = false;
+      for (let dy = -3; dy <= 3 && !hit; dy++) for (let dx = -3; dx <= 3 && !hit; dx++) {
+        const X = px + dx, Y = py + dy;
+        if (X < 0 || Y < 0 || X > 127 || Y > 127) continue;
+        for (let k = band - 2; k <= band; k++) if (k >= 0 && (g[Y * 128 + X] >> k) & 1) hit = true;
+      }
+      if (hit) ok++;
+    }
+  }
+  check(n > 400 && ok / n >= 0.95, `dungeon markers stand on mapped floors: ${ok}/${n}`);
+}
+
 // 5. Map dots: every dot sits on its location's pixel by the game's own law
 {
   const dots = load('data/mapdots.json');

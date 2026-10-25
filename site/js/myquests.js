@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=8';
-import { el, fill } from './ui.js?v=8';
-import { state, onChange, showOnMap, setHere } from './state.js?v=8';
-import { rewardGivers, nameFor, stepText } from './questText.js?v=8';
-import { showQuest } from './quests.js?v=8';
-import { openTown } from './towns.js?v=8';
-import { planRoute } from './route.js?v=8';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=8';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=9';
+import { el, fill } from './ui.js?v=9';
+import { state, onChange, showOnMap, setHere } from './state.js?v=9';
+import { rewardGivers, nameFor, stepText } from './questText.js?v=9';
+import { showQuest } from './quests.js?v=9';
+import { openTown } from './towns.js?v=9';
+import { planRoute } from './route.js?v=9';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=9';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -91,7 +91,7 @@ export function applySave(found, character) {
       || list.find(x => x.file === f.q.file && x.uid == null && compatible(x.names, f.names));
     if (e) refreshed++;
     else { e = { file: f.q.file, done: [], jobDone: false, saved: Date.now() }; list.unshift(e); added++; }
-    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, uid: f.uid, character });
+    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, spots: f.spots, uid: f.uid, character });
     e.key = f.q.file + '|' + JSON.stringify(f.names);
     seen.add(e);
   }
@@ -225,6 +225,8 @@ function importCard(quests) {
     input, drop, choose, msg);
 }
 
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
 // ---- where in town: the quest's people and places that are inside a building ----
 function inTown(q, entry) {
   const rows = [];
@@ -240,13 +242,25 @@ function inTown(q, entry) {
     const who = r.kind === 'Person' ? (n[1] || r.role) : r.role;
     rows.push({ loc, name, key: exact?.key, who, pays: q.reward.from.some(f => f.sym === sym) });
   }
-  if (!rows.length) return null;
+  // dungeon spots from a save: who or what stands where inside the quest's dungeon
+  const lines = [];
+  for (const [sym, list] of Object.entries(entry.spots || {})) {
+    const loc = entry.locs?.[sym];
+    if (loc === undefined) continue;
+    const label = what => what.map(w => nameFor(q, w, entry.names) || q.resources[w]?.role || w.replace(/_/g, ' ').trim()).join(', ');
+    const targets = list.map(t => ({ ...t, label: cap(label(t.what)) }));
+    lines.push(el('li', {},
+      el('b', { text: targets.map(t => t.label).join('; ') }), ` — inside ${data.locs.name[loc]} `,
+      el('button', { class: 'dg-link dg-find-dungeon', onclick: () => openTown(loc, null, { targets }) }, 'dungeon map')));
+  }
+  if (!rows.length && !lines.length) return null;
   return el('div', { class: 'dg-intown' },
-    el('b', { text: 'Where in town' }),
-    el('ul', { class: 'dg-trips' }, rows.map(x => el('li', {},
+    el('b', { text: 'Where to look' }),
+    lines.length ? el('ul', { class: 'dg-trips' }, lines) : null,
+    rows.length ? el('ul', { class: 'dg-trips' }, rows.map(x => el('li', {},
       el('b', { text: x.who }), x.pays ? el('span', { class: 'dg-tag dg-tag-good', text: 'pays' }) : '',
       ` — ${x.name}, ${data.locs.name[x.loc]} `,
-      el('button', { class: 'dg-link', onclick: () => openTown(x.loc, x.name, { key: x.key }) }, 'find it')))));
+      el('button', { class: 'dg-link', onclick: () => openTown(x.loc, x.name, { key: x.key }) }, 'find it')))) : null);
 }
 
 // ---- progress: tick the steps off; the next one is spelled out ----
