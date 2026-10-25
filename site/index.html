@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daggerfall Quest Guide // daggerfall.slippylabs.com</title>
+<meta name="description" content="Companion guide for Daggerfall and DFO Online: paste your journal to find the places it names, search every town and dungeon in the Iliac Bay with real travel times, quest walkthroughs with who pays the reward, and every town's buildings.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://daggerfall.slippylabs.com/">
+<meta property="og:title" content="Daggerfall Quest Guide // daggerfall.slippylabs.com">
+<meta property="og:description" content="Paste your journal, find the place. Every town and dungeon in the Iliac Bay with real travel times, quest walkthroughs with who pays the reward, and every town's buildings.">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cpath%20d%3D%22M32%204%20L40%2028%20L32%2060%20L24%2028Z%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2230%22%20r%3D%2226%22%20fill%3D%22none%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
+<meta name="theme-color" content="#050b10">
+<link rel="stylesheet" href="style.css?v=1">
+<script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
+(function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="scanlines"></div>
+
+<main class="page-wrap">
+  <div class="hud-panel xwide dg-panel">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <div class="callsign-row">
+      <span class="callsign">Iliac Bay // Field Guide</span>
+      <div class="nav-links">
+        <a href="https://daggerfalljs.dev/play/" class="logout-link" target="_blank" rel="noopener">Play DFO Online ↗</a>
+      </div>
+    </div>
+
+    <h1>DAGGERFALL QUEST GUIDE</h1>
+    <p class="subtitle">Paste your journal and find the places it names, look up any town or dungeon with real travel times, read what a quest wants and who pays the reward, and see every building in a town.</p>
+
+    <!-- Where the player is, shared by every tab -->
+    <section class="dg-here" aria-label="Where you are">
+      <div class="dg-here-row">
+        <label class="tool-field-label" for="here-input">I am in</label>
+        <div class="dg-combo">
+          <input id="here-input" class="tool-text-input" type="text" autocomplete="off" placeholder="Type a town, e.g. Daggerfall" aria-autocomplete="list" aria-controls="here-list">
+          <ul id="here-list" class="dg-suggest" role="listbox" hidden></ul>
+        </div>
+        <span id="here-region" class="dg-here-region"></span>
+      </div>
+      <div class="dg-here-row dg-options">
+        <label class="tool-field-label" for="opt-transport">Travel</label>
+        <select id="opt-transport" class="tool-select">
+          <option value="foot">On foot</option>
+          <option value="horse">On horseback</option>
+          <option value="cart">With a cart</option>
+        </select>
+        <select id="opt-pace" class="tool-select">
+          <option value="cautious">Cautiously</option>
+          <option value="reckless">Recklessly</option>
+        </select>
+        <select id="opt-sleep" class="tool-select">
+          <option value="camp">Camp out</option>
+          <option value="inn">Stay at inns</option>
+        </select>
+        <label class="tool-check"><input id="opt-ship" type="checkbox"> By ship</label>
+      </div>
+    </section>
+
+    <nav class="filter-bar dg-tabs" role="tablist">
+      <button class="hud-tab" role="tab" data-tab="journal">Journal</button>
+      <button class="hud-tab" role="tab" data-tab="map">Map &amp; search</button>
+      <button class="hud-tab" role="tab" data-tab="quests">Quests</button>
+      <button class="hud-tab" role="tab" data-tab="towns">Towns</button>
+    </nav>
+
+    <!-- Journal -->
+    <section id="tab-journal" class="dg-tab" role="tabpanel" hidden>
+      <p class="tool-note">Copy a quest entry from your journal (or type what the quest giver said) and paste it here. The guide finds the towns, dungeons and buildings it names and shows where they are from you.</p>
+      <textarea id="journal-input" class="tool-textarea" rows="5" placeholder="The Fighters Guild of Daggerfall has hired me to kill a troublesome werewolf in its lair, Ruins of Wickston Manor..."></textarea>
+      <div class="tool-controls">
+        <button id="journal-find" class="tool-btn">Find places</button>
+        <button id="journal-clear" class="tool-btn">Clear</button>
+      </div>
+      <div id="journal-out" class="dg-results" aria-live="polite"></div>
+    </section>
+
+    <!-- Map and search -->
+    <section id="tab-map" class="dg-tab" role="tabpanel" hidden>
+      <div class="dg-search-row">
+        <div class="dg-combo dg-grow">
+          <input id="map-search" class="tool-text-input" type="search" autocomplete="off" placeholder="Search any town or dungeon" aria-controls="map-suggest">
+          <ul id="map-suggest" class="dg-suggest" role="listbox" hidden></ul>
+        </div>
+        <select id="map-region" class="tool-select" aria-label="Region"></select>
+      </div>
+      <div class="dg-map-bar">
+        <button id="map-world" class="tool-btn">World</button>
+        <span id="map-title" class="dg-map-title"></span>
+        <span id="map-pages" class="dg-map-pages"></span>
+        <span class="dg-map-zoom">
+          <button id="map-zoom-out" class="tool-btn" aria-label="Zoom out">−</button>
+          <button id="map-zoom-in" class="tool-btn" aria-label="Zoom in">+</button>
+        </span>
+      </div>
+      <div class="dg-map-wrap">
+        <canvas id="map-canvas" class="dg-map" width="640" height="320"></canvas>
+        <div id="map-tip" class="dg-map-tip" hidden></div>
+      </div>
+      <div id="map-legend" class="dg-legend"></div>
+      <div id="map-detail" class="dg-results"></div>
+    </section>
+
+    <!-- Quests -->
+    <section id="tab-quests" class="dg-tab" role="tabpanel" hidden>
+      <div class="dg-search-row">
+        <input id="quest-search" class="tool-text-input dg-grow" type="search" autocomplete="off" placeholder="Quest title from your journal, e.g. Hunt for a Lycanthrope">
+        <select id="quest-guild" class="tool-select" aria-label="Who gives the quest"></select>
+      </div>
+      <div class="two-col dg-quest-cols">
+        <ul id="quest-list" class="dg-list" aria-label="Quests"></ul>
+        <div id="quest-detail" class="dg-quest-detail"></div>
+      </div>
+    </section>
+
+    <!-- Towns -->
+    <section id="tab-towns" class="dg-tab" role="tabpanel" hidden>
+      <div class="dg-search-row">
+        <div class="dg-combo dg-grow">
+          <input id="town-input" class="tool-text-input" type="text" autocomplete="off" placeholder="Town, e.g. Daggerfall" aria-controls="town-suggest">
+          <ul id="town-suggest" class="dg-suggest" role="listbox" hidden></ul>
+        </div>
+        <input id="building-search" class="tool-text-input dg-grow" type="search" autocomplete="off" placeholder="Find a building, e.g. Fighters Guild">
+      </div>
+      <div id="town-head" class="dg-town-head"></div>
+      <div class="two-col dg-town-cols">
+        <div class="dg-town-map-wrap"><canvas id="town-canvas" class="dg-town-map" width="400" height="400"></canvas></div>
+        <div id="town-buildings" class="dg-buildings"></div>
+      </div>
+    </section>
+
+    <p class="tool-note dg-credits">
+      Built from Daggerfall's own game data (freeware from Bethesda Softworks) with
+      <a href="https://github.com/Lattymoy/daggerfall-js-source" target="_blank" rel="noopener">DFO Online</a>'s readers and
+      <a href="https://github.com/Interkarma/daggerfall-unity" target="_blank" rel="noopener">Daggerfall Unity</a>'s quest scripts and travel rules (both MIT).
+      Travel times are the game's own fast-travel formula. Not affiliated with Bethesda or either project.
+    </p>
+  </div>
+</main>
+
+<script type="module" src="js/app.js?v=1"></script>
+<!-- Slippy Deck: floating Slippy TV + jukebox player. Renders nothing unless admin.slippylabs.com/whoami confirms a signed-in account. -->
+<script defer src="https://slippylabs.com/deck/deck.js"></script>
+<!-- Slippy Labs sitewide privacy link. Self-contained on purpose: these sites
+     share no CSS, so it carries its own styles and inherits the page's text
+     colour instead of assuming a palette. position/z-index are load bearing --
+     the HUD theme's .starfield/.scanlines are fixed at z-index 0-1 and would
+     paint straight over an unpositioned footer.
+     The .page-wrap trim below is what keeps the bar on the first screen. -->
+<div class="sl-legal"><a href="https://slippylabs.com/privacy.html">Privacy</a></div>
+<style>
+.sl-legal{box-sizing:border-box;position:relative;z-index:3;height:64px;display:flex;align-items:center;justify-content:center;margin:0;padding:0 12px;font-family:"Consolas","SFMono-Regular",Menlo,Monaco,"Courier New",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.5}
+.sl-legal a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px}
+.sl-legal a:hover,.sl-legal a:focus-visible{text-decoration:underline;opacity:1}
+/* This page centres .page-wrap at min-height:100vh, which would push the bar a
+   whole screen below the fold. Give back exactly the bar height instead of
+   adding a scrollbar to a page that had none. */
+.page-wrap{min-height:calc(100vh - 64px)}
+</style>
+</body>
+</html>

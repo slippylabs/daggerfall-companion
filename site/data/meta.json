@@ -1,0 +1,360 @@
+{
+ "dfoCommit": "36aa0dc3",
+ "built": "2026-10-25T02:52:35.999Z",
+ "world": {
+  "width": 1000,
+  "height": 500
+ },
+ "regions": [
+  {
+   "i": 0,
+   "name": "Alik'r Desert",
+   "locations": 344
+  },
+  {
+   "i": 1,
+   "name": "Dragontail Mountains",
+   "locations": 912
+  },
+  {
+   "i": 2,
+   "name": "Glenpoint Foothills",
+   "locations": 0
+  },
+  {
+   "i": 3,
+   "name": "Daggerfall Bluffs",
+   "locations": 0
+  },
+  {
+   "i": 4,
+   "name": "Yeorth Burrowland",
+   "locations": 0
+  },
+  {
+   "i": 5,
+   "name": "Dwynnen",
+   "locations": 778
+  },
+  {
+   "i": 6,
+   "name": "Ravennian Forest",
+   "locations": 0
+  },
+  {
+   "i": 7,
+   "name": "Devilrock",
+   "locations": 0
+  },
+  {
+   "i": 8,
+   "name": "Malekna Forest",
+   "locations": 0
+  },
+  {
+   "i": 9,
+   "name": "Isle of Balfiera",
+   "locations": 67
+  },
+  {
+   "i": 10,
+   "name": "Bantha",
+   "locations": 0
+  },
+  {
+   "i": 11,
+   "name": "Dak'fron",
+   "locations": 197
+  },
+  {
+   "i": 12,
+   "name": "Islands in the Western Iliac Bay",
+   "locations": 0
+  },
+  {
+   "i": 13,
+   "name": "Tamarilyn Point",
+   "locations": 0
+  },
+  {
+   "i": 14,
+   "name": "Lainlyn Cliffs",
+   "locations": 0
+  },
+  {
+   "i": 15,
+   "name": "Bjoulsae River",
+   "locations": 0
+  },
+  {
+   "i": 16,
+   "name": "Wrothgarian Mountains",
+   "locations": 1833
+  },
+  {
+   "i": 17,
+   "name": "Daggerfall",
+   "locations": 1331
+  },
+  {
+   "i": 18,
+   "name": "Glenpoint",
+   "locations": 445
+  },
+  {
+   "i": 19,
+   "name": "Betony",
+   "locations": 25
+  },
+  {
+   "i": 20,
+   "name": "Sentinel",
+   "locations": 549
+  },
+  {
+   "i": 21,
+   "name": "Anticlere",
+   "locations": 719
+  },
+  {
+   "i": 22,
+   "name": "Lainlyn",
+   "locations": 368
+  },
+  {
+   "i": 23,
+   "name": "Wayrest",
+   "locations": 851
+  },
+  {
+   "i": 24,
+   "name": "Gen Tem High Rock village",
+   "locations": 0
+  },
+  {
+   "i": 25,
+   "name": "Gen Rai Hammerfell village",
+   "locations": 0
+  },
+  {
+   "i": 26,
+   "name": "Orsinium Area",
+   "locations": 80
+  },
+  {
+   "i": 27,
+   "name": "Skeffington Wood",
+   "locations": 0
+  },
+  {
+   "i": 28,
+   "name": "Hammerfell bay coast",
+   "locations": 0
+  },
+  {
+   "i": 29,
+   "name": "Hammerfell sea coast",
+   "locations": 0
+  },
+  {
+   "i": 30,
+   "name": "High Rock bay coast",
+   "locations": 0
+  },
+  {
+   "i": 31,
+   "name": "High Rock sea coast",
+   "locations": 3
+  },
+  {
+   "i": 32,
+   "name": "Northmoor",
+   "locations": 380
+  },
+  {
+   "i": 33,
+   "name": "Menevia",
+   "locations": 211
+  },
+  {
+   "i": 34,
+   "name": "Alcaire",
+   "locations": 159
+  },
+  {
+   "i": 35,
+   "name": "Koegria",
+   "locations": 128
+  },
+  {
+   "i": 36,
+   "name": "Bhoriane",
+   "locations": 190
+  },
+  {
+   "i": 37,
+   "name": "Kambria",
+   "locations": 310
+  },
+  {
+   "i": 38,
+   "name": "Phrygias",
+   "locations": 191
+  },
+  {
+   "i": 39,
+   "name": "Urvaius",
+   "locations": 279
+  },
+  {
+   "i": 40,
+   "name": "Ykalon",
+   "locations": 560
+  },
+  {
+   "i": 41,
+   "name": "Daenia",
+   "locations": 291
+  },
+  {
+   "i": 42,
+   "name": "Shalgora",
+   "locations": 233
+  },
+  {
+   "i": 43,
+   "name": "Abibon-Gora",
+   "locations": 232
+  },
+  {
+   "i": 44,
+   "name": "Kairou",
+   "locations": 123
+  },
+  {
+   "i": 45,
+   "name": "Pothago",
+   "locations": 53
+  },
+  {
+   "i": 46,
+   "name": "Myrkwasa",
+   "locations": 144
+  },
+  {
+   "i": 47,
+   "name": "Ayasofya",
+   "locations": 143
+  },
+  {
+   "i": 48,
+   "name": "Tigonus",
+   "locations": 334
+  },
+  {
+   "i": 49,
+   "name": "Kozanset",
+   "locations": 49
+  },
+  {
+   "i": 50,
+   "name": "Satakalaam",
+   "locations": 156
+  },
+  {
+   "i": 51,
+   "name": "Totambu",
+   "locations": 902
+  },
+  {
+   "i": 52,
+   "name": "Mournoth",
+   "locations": 363
+  },
+  {
+   "i": 53,
+   "name": "Ephesus",
+   "locations": 214
+  },
+  {
+   "i": 54,
+   "name": "Santaki",
+   "locations": 36
+  },
+  {
+   "i": 55,
+   "name": "Antiphyllos",
+   "locations": 49
+  },
+  {
+   "i": 56,
+   "name": "Bergama",
+   "locations": 58
+  },
+  {
+   "i": 57,
+   "name": "Gavaudon",
+   "locations": 51
+  },
+  {
+   "i": 58,
+   "name": "Tulune",
+   "locations": 140
+  },
+  {
+   "i": 59,
+   "name": "Glenumbra Moors",
+   "locations": 173
+  },
+  {
+   "i": 60,
+   "name": "Ilessan Hills",
+   "locations": 596
+  },
+  {
+   "i": 61,
+   "name": "Cybiades",
+   "locations": 1
+  }
+ ],
+ "locationTypes": {
+  "0": "TownCity",
+  "1": "TownHamlet",
+  "2": "TownVillage",
+  "3": "HomeFarms",
+  "4": "DungeonLabyrinth",
+  "5": "ReligionTemple",
+  "6": "Tavern",
+  "7": "DungeonKeep",
+  "8": "HomeWealthy",
+  "9": "ReligionCult",
+  "10": "DungeonRuin",
+  "11": "HomePoor",
+  "12": "Graveyard",
+  "13": "Coven",
+  "14": "HomeYourShips",
+  "65535": "None"
+ },
+ "dungeonTypes": {
+  "0": "Crypt",
+  "1": "OrcStronghold",
+  "2": "HumanStronghold",
+  "3": "Prison",
+  "4": "DesecratedTemple",
+  "5": "Mine",
+  "6": "NaturalCave",
+  "7": "Coven",
+  "8": "VampireHaunt",
+  "9": "Laboratory",
+  "10": "HarpyNest",
+  "11": "RuinedCastle",
+  "12": "SpiderNest",
+  "13": "GiantStronghold",
+  "14": "DragonsDen",
+  "15": "BarbarianStronghold",
+  "16": "VolcanicCaves",
+  "17": "ScorpionNest",
+  "18": "Cemetery",
+  "255": "NoDungeon"
+ }
+}
