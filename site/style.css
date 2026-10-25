@@ -1563,7 +1563,7 @@ mark.regex-match { background: rgba(57, 255, 143, 0.3); color: var(--hud-green);
 @media (max-width: 560px) {
   .dg-here-row .tool-field-label { min-width: 0; width: 100%; }
   .dg-options .tool-select { flex: 1 1 45%; }
-  .dg-link { min-height: 44px; }
+  .dg-link { min-height: 44px; min-width: 44px; }
   .dg-suggest li { min-height: 44px; }
   .dg-quest-detail summary, .dg-alts summary { min-height: 44px; }
   .dg-map-zoom { margin-left: 0; }

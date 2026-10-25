@@ -12,4 +12,5 @@ node tools/build-ui.mjs
 node tools/verify.mjs
 node tools/test-recognise.mjs
 node tools/test-route.mjs
+node tools/test-save.mjs
 find site/data -type f \( -name '*.json' -o -name '*.bin' \) -exec gzip -9 -kf {} \;

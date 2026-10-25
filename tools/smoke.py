@@ -191,6 +191,29 @@ def run(base, width, height, mobile):
         page.wait_for_timeout(300)
         check(page.locator('#mine-list .dg-mine').count() == 1, f'[{tag}] Done removes a quest')
 
+        # Load from the game: DFO Online's "Export all saves" zip with two saves; pick the newest
+        page.click('#mine-list .dg-import > summary') if not page.locator('#mine-list .dg-import[open]').count() else None
+        page.set_input_files('#save-file', str(Path(__file__).resolve().parent / 'fixtures' / 'DFO-Online-Saves.zip'))
+        page.wait_for_selector('#mine-list .dg-save-pick')
+        picks = page.locator('#mine-list .dg-save-pick')
+        check(picks.count() == 2 and 'hunt done' in picks.nth(0).inner_text().lower(), f'[{tag}] save file: two saves offered, newest first')
+        picks.nth(0).click()
+        page.wait_for_selector('#mine-list .dg-import-msg b')
+        msg = page.inner_text('#mine-list .dg-import-msg')
+        check('Loaded 1 quest' in msg and 'Penbrugh' in msg, f'[{tag}] save loaded: 1 quest, "I am in" set from where the game was saved')
+        check(page.input_value('#here-input') == 'Penbrugh', f'[{tag}] header now says I am in Penbrugh')
+        mine = page.inner_text('#mine-list')
+        check('Bedoryan Kingwing in Daggerfall' in mine and '1 day left' in mine, f'[{tag}] the saved Delivery Boy: payer by name and 1 day left')
+        check('Daggerfall, Daggerfall' in mine and 'Total:' in page.inner_text('#mine-list .dg-planner'), f'[{tag}] trip and route from Penbrugh to Daggerfall')
+        page.screenshot(path=str(SHOTS / f'save_{tag}.png'), full_page=True)
+        page.set_input_files('#save-file', str(Path(__file__).resolve().parent / 'fixtures' / 'DFO-Online-Saves.zip'))
+        page.wait_for_selector('#mine-list .dg-save-pick')
+        page.locator('#mine-list .dg-save-pick').nth(1).click()
+        page.wait_for_selector('#mine-list .dg-import-msg b')
+        check(page.locator('#mine-list .dg-mine').count() == 2 and 'Lord Kain Mastercroft in Daggerfall' in page.inner_text('#mine-list')
+              and page.locator('#mine-list .dg-mine-done').count() == 1,
+              f'[{tag}] the older save fills in the hunt (giver by name, ticks kept) without doubling the delivery')
+
         # Layout: no sideways scroll, and at phone width every control is thumb-sized
         overflow = page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
         check(overflow <= 0, f'[{tag}] no horizontal overflow ({overflow}px)')
@@ -203,6 +226,7 @@ def run(base, width, height, mobile):
                   .filter(e => e.offsetParent && !e.closest('.sl-legal'))
                   .filter(e => !(e.type === 'checkbox' && e.closest('label') && e.closest('label').getBoundingClientRect().height >= 40))
                   .filter(e => !(e.tagName === 'A' && e.closest('p')))
+                  .filter(e => !e.classList.contains('dg-file'))
                   .map(e => [e.id || e.className || e.tagName, e.textContent.trim().slice(0, 24), Math.round(e.getBoundingClientRect().height), Math.round(e.getBoundingClientRect().width)])
                   .filter(([, , h, w]) => h < 40 || w < 40)''')
             seen = set()

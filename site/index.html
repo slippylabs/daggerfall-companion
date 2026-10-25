@@ -21,8 +21,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=UnifrakturMaguntia&display=swap">
-<link rel="stylesheet" href="style.css?v=3">
-<link rel="stylesheet" href="daggerfall.css?v=7">
+<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="daggerfall.css?v=8">
 <script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
 (function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
 </head>
@@ -45,7 +45,7 @@
     </div>
 
     <h1>Daggerfall Quest Guide</h1>
-    <p class="subtitle">Paste your journal and find the places it names, look up any town or dungeon with real travel times, read what a quest wants and who pays the reward, and see every building in a town.</p>
+    <p class="subtitle">Load your quests straight from your DFO Online save (My quests tab) and see where to go and who pays, look up any town or dungeon with real travel times, read what a quest wants and who pays the reward, and see every building in a town.</p>
 
     <!-- Where the player is, shared by every tab -->
     <section class="dg-here" aria-label="Where you are">
@@ -86,7 +86,7 @@
 
     <!-- Journal -->
     <section id="tab-journal" class="dg-tab" role="tabpanel" hidden>
-      <p class="tool-note">Copy a quest entry from your journal (or type what the quest giver said) and paste it here. The guide finds the towns, dungeons and buildings it names and shows where they are from you.</p>
+      <p class="tool-note">Type (or paste) a quest entry or what the quest giver said, and the guide finds the quest and the towns, dungeons and buildings it names. DFO Online's journal can't be copied, so the easiest way is to <b>load your save in the My quests tab</b>: every quest you are on comes in with its real names.</p>
       <textarea id="journal-input" class="tool-textarea" rows="5" placeholder="The Fighters Guild of Daggerfall has hired me to kill a troublesome werewolf in its lair, Ruins of Wickston Manor..."></textarea>
       <div class="tool-controls">
         <button id="journal-find" class="tool-btn">Find places</button>
@@ -151,7 +151,7 @@
 
     <!-- My quests -->
     <section id="tab-mine" class="dg-tab" role="tabpanel" hidden>
-      <p class="tool-note">The quests you are on, kept in this browser. Set "I am in" above and every trip updates. Lower "game days left" as days pass in the game.</p>
+      <p class="tool-note">The quests you are on, kept in this browser. Load them from your game save (below), and load it again after you play to bring them up to date. Every trip is timed from "I am in" above.</p>
       <div id="mine-list" class="dg-results"></div>
     </section>
 

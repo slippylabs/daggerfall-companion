@@ -242,3 +242,14 @@ code { color: var(--gold); }
 .dg-legend-line { display: inline-block; width: 18px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
 .dg-roads-toggle { min-height: 40px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .dg-roads-toggle input { width: 20px; height: 20px; }
+/* My quests: load from the game save */
+.dg-import { border: 3px double var(--ink-red); }
+.dg-import > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; }
+.dg-howto { margin: 8px 0 12px; padding-left: 22px; line-height: 1.55; color: var(--ink); }
+.dg-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.dg-drop { display: block; padding: 18px 12px; text-align: center; border: 2px dashed var(--ink-soft); background: rgba(255, 255, 255, 0.18); color: var(--ink); cursor: pointer; min-height: 44px; }
+.dg-drop:hover, .dg-drop-on, .dg-file:focus-visible + .dg-drop { background: rgba(140, 28, 19, 0.1); border-color: var(--ink-red); }
+.dg-import-choose { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.dg-import-msg { margin-top: 10px; color: var(--ink); }
+.dg-good-ink { color: #1f5f24; }
+.dg-bad-ink { color: var(--ink-red); font-weight: 600; }
