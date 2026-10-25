@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=10';
-import { el, fill } from './ui.js?v=10';
-import { state, onChange, showOnMap, setHere } from './state.js?v=10';
-import { rewardGivers, nameFor, stepText } from './questText.js?v=10';
-import { showQuest } from './quests.js?v=10';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=10';
-import { planRoute } from './route.js?v=10';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=10';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=11';
+import { el, fill } from './ui.js?v=11';
+import { state, onChange, showOnMap, setHere } from './state.js?v=11';
+import { rewardGivers, nameFor, stepText } from './questText.js?v=11';
+import { showQuest } from './quests.js?v=11';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=11';
+import { planRoute } from './route.js?v=11';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=11';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -165,6 +165,7 @@ async function render() {
 
 // ---- "Do this now": one exact instruction, then the one after it ----
 const plural = (n, w) => n > 1 ? `${n} ${w}s` : w;
+const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 // what to do, in words
 function sayAction(o, q) {
   const who = o.who || 'them';
@@ -181,49 +182,56 @@ function sayAction(o, q) {
     default: return '';
   }
 }
-// where, in words: "Daggerfall → The Wickford Residence (north-east part of town)"
-function sayWhere(o) {
+// where, as a signpost: town, building, and the part of town it stands in
+function signpost(o) {
   if (o.loc == null) return null;
   const town = data.locs.name[o.loc];
   if (o.building) {
     const t = data.towns[data.locs.region[o.loc]]?.towns?.[o.loc];
     const p = t && buildingAt(t, o.building.key);
-    return `${town} → ${o.building.name}${p ? ` (${whereInTown(t, p).replace(/^in the /, '').replace(/, about .*$/, '')})` : ''}`;
+    return { town, place: o.building.name, part: p ? whereInTown(t, p).replace(/^in the /, '').replace(/, about .*$/, '') : null };
   }
-  if (o.dungeon || o.spot) return `${town}${o.spot ? ' → the marked spot inside' : ' (dungeon)'}`;
-  return town;
+  if (o.dungeon || o.spot) return { town, place: o.spot ? 'the marked spot inside' : null, part: o.dungeon ? 'dungeon' : null };
+  return { town, place: null, part: null };
 }
-function stepBlock(o, q, label) {
-  const where = sayWhere(o);
+function nowBlock(o, q) {
+  const sp = signpost(o);
   const trip = o.loc != null && state.here >= 0 && o.loc !== state.here ? travelBetween(state.here, o.loc, state.opts) : null;
   const buttons = [];
   if (o.loc != null) {
-    if (o.building) buttons.push(el('button', { class: 'tool-btn dg-go-town', onclick: () => openTown(o.loc, o.building.name, { key: o.building.key }) }, 'Town map'));
-    if (o.spot || o.dungeon) buttons.push(el('button', { class: 'tool-btn dg-go-dungeon', onclick: () => openTown(o.loc, null, { targets: o.spot ? [{ ...o.spot, label: cap(o.who || o.item || 'Here') }] : [] }) }, o.dungeon ? 'Dungeon map' : 'Inside map'));
-    if (o.loc !== state.here) buttons.push(el('button', { class: 'tool-btn dg-go-map', onclick: () => showOnMap(o.loc, null, state.here >= 0 ? [state.here, o.loc] : null) }, 'World map'));
+    if (o.building) buttons.push(el('button', { class: 'dg-chip-btn dg-go-town', onclick: () => openTown(o.loc, o.building.name, { key: o.building.key }) }, 'Town'));
+    if (o.spot || o.dungeon) buttons.push(el('button', { class: 'dg-chip-btn dg-go-dungeon', onclick: () => openTown(o.loc, null, { targets: o.spot ? [{ ...o.spot, label: cap(o.who || o.item || 'Here') }] : [] }) }, 'Dungeon'));
+    if (o.loc !== state.here) buttons.push(el('button', { class: 'dg-chip-btn dg-go-map', onclick: () => showOnMap(o.loc, null, state.here >= 0 ? [state.here, o.loc] : null) }, 'World'));
   }
-  return el('div', { class: `dg-step-block dg-step-${label.toLowerCase()}` },
-    el('div', { class: 'dg-step-label', text: label === 'NOW' ? '▶ NOW' : '▷ THEN' }),
-    el('div', { class: 'dg-step-body' },
-      where ? el('div', { class: 'dg-step-where' }, where,
-        o.loc === state.here ? el('span', { class: 'dg-tag dg-tag-good', text: 'you are here' })
-          : trip ? el('span', { class: 'dg-step-trip', text: ` · ${formatDuration(trip.minutes)} away` }) : null) : null,
-      el('div', { class: 'dg-step-what', text: sayAction(o, q) + '.' + (o.later ? ' (It appears once the step before is done.)' : '') }),
-      label === 'NOW' && buttons.length ? el('div', { class: 'dg-step-buttons' }, ...buttons) : null));
+  const meta = [sp?.part, o.loc === state.here ? 'you are here' : trip ? `${formatDuration(trip.minutes)} away` : null].filter(Boolean);
+  return el('div', { class: 'dg-step-block dg-step-now' },
+    sp ? el('div', { class: 'dg-sign' },
+      el('span', { class: 'dg-sign-arrow', text: '▶' }),
+      el('span', { class: 'dg-sign-town', text: sp.town }),
+      sp.place ? el('span', { class: 'dg-sign-sep', text: '›' }) : null,
+      sp.place ? el('span', { class: 'dg-sign-place', text: sp.place }) : null) : null,
+    meta.length ? el('div', { class: 'dg-sign-meta', text: meta.join(' · ') }) : null,
+    el('div', { class: 'dg-step-what', text: sayAction(o, q) + '.' + (o.later ? ' (It appears once the step before is done.)' : '') }),
+    buttons.length ? el('div', { class: 'dg-step-buttons' }, ...buttons) : null);
+}
+function thenLine(o, q) {
+  const sp = signpost(o);
+  const where = sp ? [sp.town, sp.place].filter(Boolean).join(' › ') : '';
+  return el('div', { class: 'dg-then' }, el('span', { class: 'dg-then-label', text: 'then: ' }), sayAction(o, q) + (where ? ` (${where})` : '') + '.');
 }
 function nowCard(q, entry) {
   const g = entry.guide;
-  const head = el('div', { class: 'dg-card-head' },
+  const remove = () => { list = list.filter(e => e !== entry); save(); render(); };
+  const head = el('div', { class: 'dg-card-head dg-now-head' },
     el('span', { class: 'dg-card-name', text: q.title || q.file }),
-    el('span', { class: 'dg-tag' + (entry.daysLeft != null && entry.daysLeft <= 2 ? ' dg-tag-warn' : ''), text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'} left` : 'no time limit' }));
+    el('span', { class: 'dg-now-side' },
+      el('span', { class: 'dg-tag' + (entry.daysLeft != null && entry.daysLeft <= 2 ? ' dg-tag-warn' : ''), text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'}` : 'no limit' }),
+      el('button', { class: 'dg-done', title: 'Done: remove this quest', 'aria-label': 'Done, remove this quest', onclick: remove }, '✓')));
   const body = !g.length
-    ? el('div', { class: 'dg-step-block dg-step-now' }, el('div', { class: 'dg-step-label', text: '▶ NOW' }),
-      el('div', { class: 'dg-step-body' }, el('div', { class: 'dg-step-what', text: 'Nothing the guide can point to. Check the quest in your journal, or open Details.' })))
-    : [stepBlock(g[0], q, 'NOW'), g[1] ? stepBlock(g[1], q, 'THEN') : null];
+    ? el('div', { class: 'dg-step-block dg-step-now' }, el('div', { class: 'dg-step-what', text: 'Nothing the guide can point to. Check the quest in your journal, or open details.' }))
+    : [nowBlock(g[0], q), g[1] ? thenLine(g[1], q) : null];
   return el('div', { class: 'dg-card dg-mine dg-mine-now' }, head, body,
-    el('details', { class: 'dg-more' }, el('summary', { text: 'Details' }), ...legacyParts(q, entry)),
-    el('div', { class: 'dg-card-actions' },
-      el('button', { class: 'tool-btn', onclick: () => { list = list.filter(e => e !== entry); save(); render(); } }, 'Done ✓')));
+    el('details', { class: 'dg-more' }, el('summary', { text: 'details' }), ...legacyParts(q, entry)));
 }
 
 // ---- quests added from the journal or the Quests tab (no save): the full card ----
@@ -310,6 +318,15 @@ function syncCard(quests) {
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dg-drop-on'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('dg-drop-on'));
   drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('dg-drop-on'); if (e.dataTransfer.files[0]) take(e.dataTransfer.files[0]); });
+  const last = Math.max(0, ...list.map(e => e.synced || 0));
+  if (list.length) {
+    return el('div', { class: 'dg-bar dg-import' },
+      el('div', { class: 'dg-bar-row' },
+        el('span', { class: 'dg-bar-title', text: '⚔ ' + (last ? `Synced ${ago(last)}` : 'Sync from the game') }),
+        el('a', { class: 'dg-bar-link', href: 'sync.html' }, 'how to sync')),
+      msg,
+      el('details', { class: 'dg-import-file', open: fileOpen }, el('summary', { text: 'load a saves file' }), input, drop, choose));
+  }
   return el('div', { class: 'dg-card dg-import' },
     el('div', { class: 'dg-sync-row' },
       el('div', {},

@@ -1,13 +1,13 @@
 // Journal tab: paste quest text, find every town/dungeon and building it names.
-import { data, normalise, regionName, loadTowns, travelBetween } from './data.js?v=10';
-import { el, fill, locationCard } from './ui.js?v=10';
-import { state, showOnMap } from './state.js?v=10';
-import { openTown } from './towns.js?v=10';
-import { recognise } from './recognise.js?v=10';
-import { showQuest } from './quests.js?v=10';
-import { trackQuest, trackState } from './myquests.js?v=10';
-import { stepText, rewardGivers, nameFor } from './questText.js?v=10';
-import { formatDuration } from './data.js?v=10';
+import { data, normalise, regionName, loadTowns, travelBetween } from './data.js?v=11';
+import { el, fill, locationCard } from './ui.js?v=11';
+import { state, showOnMap } from './state.js?v=11';
+import { openTown } from './towns.js?v=11';
+import { recognise } from './recognise.js?v=11';
+import { showQuest } from './quests.js?v=11';
+import { trackQuest, trackState } from './myquests.js?v=11';
+import { stepText, rewardGivers, nameFor } from './questText.js?v=11';
+import { formatDuration } from './data.js?v=11';
 
 const $ = id => document.getElementById(id);
 let nameIndex = null, regionIndex = null;

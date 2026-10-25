@@ -49,6 +49,9 @@ let towns = 0, buildings = 0, biggest = 0;
 // Fixed NPCs (factions of type Individual: Lord Kain, guild masters...) stand in a building's interior as a
 // people record carrying their faction id; a quest naming one has no Place for them in the save
 const individuals = {};
+// Each town block's own 64x64 automap (RMB fldHeader.autoMapData: 0 street, 0xfb ground flat, else
+// buildingType + 1), the picture Daggerfall's town map draws; one file per distinct block
+const automaps = new Map();
 for (let r = 0; r < maps.regionCount; r++) {
   const region = maps.getRegion(r);
   if (!region) continue;
@@ -60,6 +63,14 @@ for (let r = 0; r < maps.regionCount; r++) {
     const opts = nameOpts(r, loc);
     const list = buildingSummaries(loc.exterior.buildings, layout.blocks, opts);
     const keyOf = new Map(list.map(b => [`${b.blockX},${b.blockY},${b.recordIndex}`, b]));
+    // block names on the town grid, index y*w + x (x west to east, y south to north)
+    const grid = new Array(layout.width * layout.height).fill('');
+    for (const blk of layout.blocks) {
+      const name = String(blk.blockName || '').replace(/\.RMB$/i, '');
+      grid[(blk.y ?? 0) * layout.width + (blk.x ?? 0)] = name;
+      const am = blk.dfBlock?.rmbBlock?.fldHeader?.autoMapData;
+      if (name && am && !automaps.has(name)) automaps.set(name, Uint8Array.from(am));
+    }
     for (const blk of layout.blocks) {
       (blk.dfBlock?.rmbBlock?.subRecords ?? []).forEach((sub, i) => {
         for (const p of sub?.interior?.blockPeopleRecords ?? []) {
@@ -90,7 +101,7 @@ for (let r = 0; r < maps.regionCount; r++) {
       return row;
     });
     const id = indexOf.get(`${r}:${loc.name}`);
-    out[id] = { name: loc.name, w: layout.width, h: layout.height, b: rows, houses };
+    out[id] = { name: loc.name, w: layout.width, h: layout.height, bn: grid, b: rows, houses };
     towns++;
     buildings += rows.length + houses.length / 5;
   }
@@ -103,4 +114,6 @@ mkdirSync(join(ROOT, 'tools/.cache'), { recursive: true });
 writeFileSync(join(ROOT, 'tools/.cache/individuals-towns.json'), JSON.stringify(Object.fromEntries(Object.entries(individuals)
   .map(([id, list]) => [id, { name: factions.getFaction(+id)?.name ?? '', at: list }]))));
 console.log(`${Object.keys(individuals).length} fixed NPCs placed in buildings`);
+for (const [name, bytes] of automaps) writeOut(`data/rmb/${name}.bin`, bytes);
+console.log(`${automaps.size} town blocks' automaps written`);
 console.log(`${towns} locations with buildings, ${buildings} buildings, largest region file ${(biggest / 1024).toFixed(0)} KB`);

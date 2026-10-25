@@ -1,20 +1,31 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=10';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=10';
-import { state } from './state.js?v=10';
-import { showDungeon, dungeonBlocks } from './dungeon.js?v=10';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=11';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=11';
+import { state } from './state.js?v=11';
+import { showDungeon, dungeonBlocks } from './dungeon.js?v=11';
+import { townMap } from './townmap.js?v=11';
 
 const $ = id => document.getElementById(id);
-const canvas = $('town-canvas'), ctx = canvas.getContext('2d');
 const BLOCK = 102.4;   // one RMB block is 4096 Daggerfall units = 102.4 m
 let current = null, highlight = null, mark = null, tabs = null;
 const HOUSE = 5;   // houses: [blockX, blockY, x, z, buildingKey] per house
 
-const COLOURS = {
-  GuildHall: '#ff9130', Temple: '#ffe066', Tavern: '#b07cff', Palace: '#ff4655', Bank: '#5ab8ff', Library: '#7fe0ff',
-  default: '#39ff8f',
+// Daggerfall's own town-map colours by building group (DFU automap settings, as DFO townQuarters.js has them);
+// the list's group dots use the same, so a colour on the map is the colour in the list
+const TOWN_COLOURS = { temple: '#c37d45', shop: '#1855be', tavern: '#307555', house: '#283c45', wall: '#1b1d22', street: '#cfb07a', select: '#f2cd52' };
+const GROUP_OF_BYTE = (() => {
+  const g = new Array(256).fill('house');
+  g[0] = null; g[0xfb] = null;
+  for (const v of [1, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14]) g[v] = 'shop';
+  for (const v of [12, 15]) g[v] = 'temple';
+  g[16] = 'tavern';
+  return g;
+})();
+// a building type's colour: its automap byte is the type's number + 1
+const colourFor = (file, t) => {
+  const v = Object.entries(file.buildingTypes).find(([, n]) => n === t)?.[0];
+  return TOWN_COLOURS[GROUP_OF_BYTE[(+v || 0) + 1] || 'house'];
 };
-const colourFor = t => COLOURS[t] || COLOURS.default;
 const ORDER = ['GuildHall', 'Temple', 'Palace', 'Tavern', 'Bank', 'Library', 'Alchemist', 'Armorer', 'WeaponSmith', 'GeneralStore',
   'PawnShop', 'Bookseller', 'ClothingStore', 'FurnitureStore', 'GemStore'];
 const FRIENDLY = {
@@ -28,7 +39,6 @@ export function initTowns(tabApi) {
   tabs = tabApi;
   autocomplete($('town-input'), $('town-suggest'), { onPick: i => openTown(i), filter: i => data.locs.type[i] !== 14 });
   $('building-search').addEventListener('input', () => { mark = null; renderList(); drawMap(); });
-  new ResizeObserver(() => drawMap()).observe(canvas.parentElement);
 }
 
 // Called by the tab switcher: default to where the player is
@@ -83,10 +93,20 @@ export async function openTown(i, buildingName = null, opts = {}) {
     current.town || (await dungeonBlocks(i)) ? null : el('p', { class: 'tool-note', text: 'This place has no buildings and no dungeon on its map.' }));
   if (current.i !== i) return;   // a later pick won while the dungeon list loaded
   $('town-cols').hidden = !current.town;
-  const dv = $('dungeon-view');
-  dv.hidden = !(await dungeonBlocks(i));
-  if (!dv.hidden) await showDungeon(dv, i, opts.targets || []);
-  else fill(dv);
+  // a dungeon: its map, right here; a town with a castle or dungeon under it: folded below the town map,
+  // unless a quest spot inside was asked for
+  const dv = $('dungeon-view'), fold = $('dungeon-fold');
+  const hasDungeon = !!(await dungeonBlocks(i));
+  const folded = hasDungeon && current.town && !opts.targets?.length;
+  fold.hidden = !folded;
+  fold.open = false;
+  if (folded) fold.append(dv); else fold.after(dv);
+  dv.hidden = !hasDungeon;
+  if (hasDungeon) {
+    if (folded) fold.ontoggle = () => { if (fold.open && !dv.dataset.drawn) { dv.dataset.drawn = '1'; showDungeon(dv, i, []); } };
+    else await showDungeon(dv, i, opts.targets || []);
+    dv.dataset.drawn = folded ? '' : '1';
+  } else fill(dv);
   renderList();
   drawMap();
 }
@@ -108,7 +128,7 @@ function renderList() {
   fill(box, 
     el('p', { class: 'tool-note', text: `${town.b.length} named buildings and ${town.houses.length / HOUSE} houses. Houses are named only when a quest picks one.` }),
     ...keys.map(t => el('div', { class: 'dg-bgroup' },
-      el('h3', {}, el('span', { class: 'dg-legend-dot', style: `background:${colourFor(t)}` }), FRIENDLY[t] || t),
+      el('h3', {}, el('span', { class: 'dg-legend-dot', style: `background:${colourFor(file, t)}` }), FRIENDLY[t] || t),
       el('ul', {}, groups.get(t).sort((a, b) => a[0].localeCompare(b[0])).map(b => el('li', {},
         el('button', {
           class: 'dg-link' + (b[0] === highlight ? ' dg-on' : ''),
@@ -117,63 +137,14 @@ function renderList() {
     rows.length ? null : el('p', { class: 'tool-note', text: 'No building with that name here. If it is a house ("The … Residence"), the quest named it — ask townspeople where it is.' }));
 }
 
-function drawMap() {
-  const wrap = canvas.parentElement;
-  const size = Math.max(240, Math.min(wrap.clientWidth, 520));
-  canvas.width = canvas.height = Math.round(size * devicePixelRatio);
-  canvas.style.width = canvas.style.height = `${size}px`;
-  ctx.fillStyle = '#0d0d10';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+// The town map (townmap.js): Daggerfall's own automap picture of the town, the chosen building lit up
+let map = null;
+async function drawMap() {
   if (!current?.town) return;
   const { town, file } = current;
-  const span = Math.max(town.w, town.h) * BLOCK;
-  const pad = 14 * devicePixelRatio;
-  const s = (canvas.width - pad * 2) / span;
-  const ox = pad + (span - town.w * BLOCK) * s / 2, oy = pad + (span - town.h * BLOCK) * s / 2;
-  // north up: block y and z grow north, so flip
-  const X = (bx, x) => ox + (bx * BLOCK + x) * s;
-  const Y = (by, z) => oy + (town.h * BLOCK - (by * BLOCK + z)) * s;
-
-  ctx.strokeStyle = 'rgba(57,255,143,0.25)';
-  ctx.lineWidth = 1;
-  for (let bx = 0; bx < town.w; bx++)
-    for (let by = 0; by < town.h; by++)
-      ctx.strokeRect(X(bx, 0), Y(by, BLOCK), BLOCK * s, BLOCK * s);
-
-  const r = Math.max(2.5 * devicePixelRatio, s * 3);
-  ctx.fillStyle = 'rgba(127,166,149,0.55)';
-  for (let k = 0; k < town.houses.length; k += HOUSE)
-    ctx.fillRect(X(town.houses[k], town.houses[k + 2]) - r / 2, Y(town.houses[k + 1], town.houses[k + 3]) - r / 2, r, r);
-  let hl = null;
-  for (const b of town.b) {
-    const t = file.buildingTypes[b[1]];
-    ctx.fillStyle = colourFor(t);
-    const x = X(b[4], b[6]), y = Y(b[5], b[7]);
-    ctx.fillRect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4);
-    if (b[0] === highlight) hl = { x, y, name: b[0] };
-  }
-  if (mark) hl = { x: X(mark.bx, mark.x), y: Y(mark.by, mark.z), name: mark.name };
-  if (hl) {
-    // a quest house: a red dot inside the ring, so it stands out among the grey houses
-    if (mark) {
-      ctx.fillStyle = '#ff4655';
-      ctx.beginPath(); ctx.arc(hl.x, hl.y, r * 1.2, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.5 * devicePixelRatio;
-    const ring = r * 3;
-    ctx.beginPath(); ctx.arc(hl.x, hl.y, ring, 0, Math.PI * 2); ctx.stroke();
-    ctx.font = `600 ${14 * devicePixelRatio}px 'EB Garamond', Georgia, serif`;
-    const w = ctx.measureText(hl.name).width;
-    // label to the right of the ring, or to its left when it would run off the canvas
-    const lx = hl.x + ring + 6 + w + 4 <= canvas.width ? hl.x + ring + 6 : Math.max(4, hl.x - ring - 6 - w);
-    ctx.fillStyle = 'rgba(231,212,168,0.95)';
-    ctx.fillRect(lx - 4, hl.y - 10 * devicePixelRatio, w + 8, 18 * devicePixelRatio);
-    ctx.fillStyle = '#2a1a0b';
-    ctx.fillText(hl.name, lx, hl.y + 4 * devicePixelRatio);
-  }
-  ctx.fillStyle = 'rgba(217,251,232,0.8)';
-  ctx.font = `bold ${12 * devicePixelRatio}px 'EB Garamond', Georgia, serif`;
-  ctx.fillText('N ↑', canvas.width - 40 * devicePixelRatio, 16 * devicePixelRatio);
+  map ||= townMap($('town-map'), { colours: TOWN_COLOURS, groupOfByte: GROUP_OF_BYTE,
+    onPick: name => { highlight = name; mark = null; renderList(); drawMap(); } });
+  const named = town.b.map(b => ({ name: b[0], bx: b[4], by: b[5], x: b[6], z: b[7], type: file.buildingTypes[b[1]] }));
+  const sel = mark || (highlight && named.find(b => b.name === highlight)) || null;
+  await map.show(town, named, sel ? { ...sel, name: sel.name, quest: !!mark } : null, data.locs.name[current.i]);
 }
-

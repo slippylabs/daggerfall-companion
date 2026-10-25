@@ -229,6 +229,13 @@ def run(base, width, height, mobile):
         page.wait_for_selector('#town-head .dg-town-mark')
         where = page.inner_text('#town-head .dg-town-mark')
         check('The Wickford Residence' in where and 'part of town' in where, f'[{tag}] Town map: the quest house is marked in Daggerfall ({where.splitlines()[-1][:70]})')
+        page.wait_for_timeout(500)
+        colours = page.evaluate('''() => { const c = document.querySelector('#town-map canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+          const n = {}; const key = (r, g, b) => ({ '24,85,190': 'shop', '195,125,69': 'temple', '48,117,85': 'tavern', '242,205,82': 'select', '207,176,122': 'street' })[[r, g, b].join()];
+          for (let i = 0; i < d.length; i += 4) { const k = key(d[i], d[i + 1], d[i + 2]); if (k) n[k] = (n[k] || 0) + 1; } return n; }''')
+        check(all(colours.get(k, 0) > 50 for k in ['shop', 'street', 'select']), f'[{tag}] town map: the game\'s own colours, the quest house lit up ({colours})')
+        box = page.locator('#town-map canvas').bounding_box()
+        page.mouse.move(box['x'] + 5, box['y'] + 5)
         page.screenshot(path=str(SHOTS / f'house_{tag}.png'), full_page=True)
         # the older save: the werewolf is alive, so NOW is the kill and THEN the reward
         page.click('.hud-tab[data-tab="mine"]')
@@ -239,8 +246,8 @@ def run(base, width, height, mobile):
         page.wait_for_selector('#mine-list .dg-import-msg b')
         page.wait_for_timeout(300)
         hunt = page.locator('#mine-list .dg-mine-now:has-text("Hunt for a Lycanthrope")')
-        hn, ht = hunt.locator('.dg-step-now').inner_text(), hunt.locator('.dg-step-then').inner_text()
-        check('Kill the Werewolf' in hn and 'Ruins of Wickston Manor' in hn and 'Collect your reward' in ht,
+        hn, ht = hunt.locator('.dg-step-now').inner_text(), hunt.locator('.dg-then').inner_text()
+        check('Kill the Werewolf' in hn and 'Ruins of Wickston Manor' in hn and 'then:' in ht.lower() and 'Collect your reward' in ht,
               f'[{tag}] Hunt (beast alive): NOW kill the Werewolf in Ruins of Wickston Manor, THEN the reward')
         check(page.locator('#mine-list .dg-mine-now').count() == 2, f'[{tag}] loading again refreshes, never doubles')
         hunt.locator('.dg-go-dungeon').click()
@@ -252,6 +259,11 @@ def run(base, width, height, mobile):
         page.screenshot(path=str(SHOTS / f'dungeon_{tag}.png'), full_page=True)
         page.click('.hud-tab[data-tab="mine"]')
         page.wait_for_selector('#mine-list .dg-mine')
+        check(page.locator('#mine-list .dg-bar').count() == 1, f'[{tag}] with quests, sync is a slim bar')
+        n = page.locator('#mine-list .dg-mine-now').count()
+        page.locator('#mine-list .dg-mine-now .dg-done').first.click()
+        page.wait_for_timeout(300)
+        check(page.locator('#mine-list .dg-mine-now').count() == n - 1, f'[{tag}] the header ✓ removes a finished quest')
 
         # Layout: no sideways scroll, and at phone width every control is thumb-sized
         overflow = page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')

@@ -94,6 +94,33 @@ for (const name of ['Daggerfall', 'Ruins of Wickston Manor', 'The Fortress of Ma
   check(n > 400 && ok / n >= 0.95, `dungeon markers stand on mapped floors: ${ok}/${n}`);
 }
 
+// 4c. Town maps: a building's anchor stands on its own automap byte (buildingType + 1) once the block's rows
+// run north-first (93% as built; the unflipped map gives ~42%), which pins the town map's orientation
+{
+  const cache = {};
+  const am = n => (n in cache ? cache[n] : (cache[n] = (() => { try { return readFileSync(join(SITE, `data/rmb/${n}.bin`)); } catch { return null; } })()));
+  let n = 0, ok = 0;
+  for (const r of [17, 16, 20, 23]) {
+    const file = load(`data/towns/r${r}.json`);
+    for (const t of Object.values(file.towns)) {
+      const W = t.w * 64, H = t.h * 64;
+      const byteAt = (x, y) => {
+        if (x < 0 || y < 0 || x >= W || y >= H) return -1;
+        const a = am(t.bn[(t.h - 1 - Math.floor(y / 64)) * t.w + Math.floor(x / 64)]);
+        return a ? a[(y % 64) * 64 + (x % 64)] : -1;
+      };
+      for (const b of t.b) {
+        const x = b[4] * 64 + Math.trunc(b[6] / 102.4 * 64), y = H - 1 - (b[5] * 64 + Math.trunc(b[7] / 102.4 * 64));
+        n++;
+        let hit = false;
+        for (let dy = -1; dy <= 1 && !hit; dy++) for (let dx = -1; dx <= 1 && !hit; dx++) if (byteAt(x + dx, y + dy) === b[1] + 1) hit = true;
+        if (hit) ok++;
+      }
+    }
+  }
+  check(n > 5000 && ok / n >= 0.9, `buildings stand on their own colour on the town maps: ${ok}/${n}`);
+}
+
 // 5. Map dots: every dot sits on its location's pixel by the game's own law
 {
   const dots = load('data/mapdots.json');

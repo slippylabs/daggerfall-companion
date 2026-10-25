@@ -296,3 +296,60 @@ code { color: var(--gold); }
 @media (max-width: 560px) {
   .dg-step-block { grid-template-columns: 1fr; gap: 4px; }
 }
+/* Towns: Daggerfall's own town map in a stone-and-gold frame */
+.dg-town-cols { grid-template-columns: minmax(260px, 1.5fr) minmax(220px, 1fr); }
+.dg-tmap-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.dg-tmap-caption { font-family: var(--caps); font-weight: 700; font-size: 1.05rem; color: var(--gold); letter-spacing: 0.06em; text-shadow: 0 1px 0 #000; }
+.dg-tmap-zoom { display: flex; gap: 6px; }
+.dg-tmap-zoom .tool-btn { min-width: 44px; min-height: 40px; padding: 0 10px; }
+.dg-tmap-frame { position: relative; padding: 6px; background: linear-gradient(#6b5320, #3a2c10); border: 3px solid var(--stone-lo); box-shadow: 0 0 0 2px var(--gold-dim), inset 0 0 0 1px rgba(242, 205, 82, 0.5), 0 6px 16px rgba(0, 0, 0, 0.6); touch-action: none; }
+.dg-tmap-canvas { display: block; width: 100%; cursor: grab; box-shadow: inset 0 0 18px rgba(60, 35, 10, 0.5); }
+.dg-tmap-tip { position: absolute; pointer-events: none; padding: 3px 8px; background: rgba(238, 222, 190, 0.97); border: 1px solid #5a3a1a; color: var(--ink); font-family: var(--serif); font-size: 0.95rem; white-space: nowrap; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); }
+.dg-tmap-legend { margin-top: 8px; }
+@media (max-width: 760px) { .dg-town-cols { grid-template-columns: 1fr; } }
+/* My quests v2.1: compact signpost cards */
+#mine-list { display: flex; flex-direction: column; gap: 10px; }
+#mine-list > .dg-card { margin: 0; }
+.dg-mine-now { padding: 10px 14px 6px; }
+.dg-now-head { align-items: center; gap: 10px; }
+.dg-now-side { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.dg-done { min-width: 44px; min-height: 40px; border: 2px solid var(--ink-soft); background: rgba(255, 245, 215, 0.4); color: #1f5f24; font-size: 1.2rem; font-weight: 700; cursor: pointer; border-radius: 3px; }
+.dg-done:hover { background: #1f5f24; color: #fff; border-color: #1f5f24; }
+.dg-mine-now .dg-step-block { display: block; grid-template-columns: none; margin-top: 8px; padding: 8px 12px 10px; }
+.dg-sign { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--ink); line-height: 1.25; }
+.dg-sign-arrow { color: var(--ink-red); font-size: 0.85rem; }
+.dg-sign-town { font-family: var(--caps); font-weight: 700; font-size: 1.12rem; letter-spacing: 0.04em; }
+.dg-sign-sep { color: var(--ink-red); font-weight: 700; }
+.dg-sign-place { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; }
+.dg-sign-meta { margin: 1px 0 0 18px; font-size: 0.92rem; color: var(--ink-soft); font-style: italic; }
+.dg-mine-now .dg-step-what { margin: 6px 0 0 18px; font-size: 1.05rem; font-weight: 400; }
+.dg-mine-now .dg-step-buttons { margin: 8px 0 0 18px; gap: 6px; }
+.dg-chip-btn { min-height: 40px; min-width: 64px; padding: 0 14px; font-family: var(--caps); font-size: 0.78rem; letter-spacing: 0.05em; color: var(--gold); background: linear-gradient(#5b5b66, #34343c); border: 2px solid; border-color: var(--stone-hi) var(--stone-lo) var(--stone-lo) var(--stone-hi); cursor: pointer; }
+.dg-chip-btn:hover { color: #fff; }
+.dg-then { margin: 6px 0 0 30px; color: var(--ink-soft); font-style: italic; font-size: 0.98rem; line-height: 1.35; }
+.dg-then-label { font-family: var(--caps); font-style: normal; font-size: 0.75rem; letter-spacing: 0.06em; }
+.dg-mine-now .dg-more { margin-top: 2px; text-align: right; }
+.dg-mine-now .dg-more > summary { justify-content: flex-end; font-family: var(--serif); font-size: 0.85rem; font-style: italic; text-transform: none; }
+.dg-mine-now .dg-more[open] { text-align: left; }
+/* slim bars at the top of My quests */
+.dg-bar { padding: 4px 12px; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--panel-border); color: var(--text); }
+.dg-bar-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-height: 40px; }
+.dg-bar-title { font-family: var(--caps); font-size: 0.85rem; color: var(--gold); letter-spacing: 0.05em; }
+.dg-bar-link { color: var(--text-dim); font-style: italic; min-height: 40px; display: inline-flex; align-items: center; }
+.dg-bar .dg-import-file > summary { color: var(--text-dim); font-style: italic; }
+.dg-bar .dg-import-msg, .dg-bar .dg-import-msg * { color: var(--text); }
+.dg-bar .dg-good-ink { color: #9fe39a; }
+.dg-bar .dg-drop { color: var(--ink); }
+#mine-list > .dg-planner { padding: 2px 12px; background: rgba(0, 0, 0, 0.28); border: 1px solid var(--panel-border); box-shadow: none; }
+#mine-list > .dg-planner:not([open]) { color: var(--text); }
+#mine-list > .dg-planner > summary .dg-card-name { font-size: 0.85rem; color: var(--gold); }
+#mine-list > .dg-planner > summary .dg-tag { color: var(--gold); border-color: var(--gold-dim); background: rgba(0, 0, 0, 0.25); }
+#mine-list > .dg-planner[open] { background: #c99a5f url("img/ui/parchment.png"); background-size: cover; padding: 8px 14px; }
+#mine-list > .dg-planner[open] > summary .dg-card-name { color: var(--ink-red); }
+@media (max-width: 560px) {
+  .dg-sign-meta, .dg-mine-now .dg-step-what, .dg-mine-now .dg-step-buttons { margin-left: 0; }
+  .dg-then { margin-left: 12px; }
+}
+.dg-dungeon-fold { margin-top: 14px; }
+.dg-dungeon-fold > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-family: var(--caps); color: var(--gold); letter-spacing: 0.05em; }
+.dg-dungeon-fold[hidden] { display: none; }
