@@ -1,8 +1,8 @@
 // Map tab: the game's own travel-map art. World view = TRAV0I00 (click a region);
 // region view = its FMAP page(s) with every location dot placed by the game's own law.
-import { data, regionName, typeWord, searchLocations, travelBetween } from './data.js?v=2';
-import { el, fill, autocomplete, locationCard } from './ui.js?v=2';
-import { state, registerMap, onChange } from './state.js?v=2';
+import { data, regionName, typeWord, searchLocations, travelBetween } from './data.js?v=3';
+import { el, fill, autocomplete, locationCard } from './ui.js?v=3';
+import { state, registerMap, onChange } from './state.js?v=3';
 
 const $ = id => document.getElementById(id);
 const canvas = $('map-canvas'), ctx = canvas.getContext('2d');
@@ -204,7 +204,7 @@ function click(x, y) {
 
 function draw() {
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#050b10';
+  ctx.fillStyle = '#0d0d10';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (view.mode === 'world') return drawWorld();
   const p = pageInfo();
@@ -240,11 +240,11 @@ function draw() {
     ctx.lineWidth = 2.5 * devicePixelRatio;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
     if (label) {
-      ctx.font = `${12 * devicePixelRatio}px Consolas, monospace`;
+      ctx.font = `600 ${14 * devicePixelRatio}px 'EB Garamond', Georgia, serif`;
       const w = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(5,11,16,0.85)';
+      ctx.fillStyle = 'rgba(231,212,168,0.95)';
       ctx.fillRect(cx + r + 3, cy - 9 * devicePixelRatio, w + 8, 18 * devicePixelRatio);
-      ctx.fillStyle = colour;
+      ctx.fillStyle = '#2a1a0b';
       ctx.fillText(label, cx + r + 7, cy + 4 * devicePixelRatio);
     }
   };

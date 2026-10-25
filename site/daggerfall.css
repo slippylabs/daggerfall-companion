@@ -1,0 +1,220 @@
+/* ==== Daggerfall theme ====
+   Stone, parchment and gold in the style of Daggerfall's own interface. The textures are cut
+   from the game's art (tools/build-ui.mjs): the spellbook's chiseled stone and the logbook's
+   parchment and rollers. Loaded after style.css and overrides its space look. */
+:root {
+  --stone: #4b4b54;
+  --stone-hi: #8d8d98;
+  --stone-lo: #1e1e24;
+  --gold: #f2cd52;
+  --gold-dim: #c9a43d;
+  --red: #8c1c13;
+  --red-hi: #b8352a;
+  --ink: #2a1a0b;
+  --ink-soft: #4a3320;
+  --ink-red: #7a1810;
+  --text: #ece2c9;
+  --text-dim: #b9ad92;
+  --hud-green: var(--gold);
+  --hud-green-dim: var(--gold-dim);
+  --hud-orange: #e39a3b;
+  --hud-red: #e05040;
+  --text-main: var(--text);
+  --panel-border: rgba(242, 205, 82, 0.35);
+  --serif: "EB Garamond", Garamond, "Times New Roman", serif;
+  --caps: "Cinzel", "Trajan Pro", Georgia, serif;
+}
+
+body {
+  font-family: var(--serif);
+  font-size: 17px;
+  color: var(--text);
+  background:
+    linear-gradient(rgba(12, 9, 6, 0.82), rgba(12, 9, 6, 0.9)),
+    url("img/ui/stone.png") repeat;
+  background-size: auto, 208px 240px;
+  image-rendering: auto;
+}
+.starfield, .scanlines, .corner, .toad-avatar-wrap, .lock-reticle { display: none !important; }
+
+/* The main frame: a chiseled stone panel, light top-left edge and dark bottom-right like the game's */
+.hud-panel {
+  background:
+    linear-gradient(rgba(30, 28, 34, 0.55), rgba(20, 18, 22, 0.7)),
+    url("img/ui/stone.png") repeat;
+  background-size: auto, 208px 240px;
+  border: 4px solid;
+  border-color: var(--stone-hi) var(--stone-lo) var(--stone-lo) var(--stone-hi);
+  box-shadow: 0 0 0 2px #0a0a0c, 0 18px 50px rgba(0, 0, 0, 0.7);
+  backdrop-filter: none;
+}
+
+h1 {
+  font-family: "UnifrakturMaguntia", "Old English Text MT", var(--caps);
+  font-weight: 400;
+  font-size: clamp(2rem, 6vw, 3.1rem);
+  letter-spacing: 0.01em;
+  color: var(--gold);
+  text-shadow: 2px 2px 0 #000, 0 0 18px rgba(242, 205, 82, 0.25);
+  margin: 4px 0 6px;
+  text-transform: none;
+}
+.callsign { font-family: var(--caps); color: var(--gold-dim); letter-spacing: 0.12em; font-size: 0.78rem; text-shadow: 1px 1px 0 #000; }
+.subtitle { font-family: var(--serif); color: var(--text-dim); font-size: 1.05rem; line-height: 1.5; }
+.tool-note { font-family: var(--serif); color: var(--text-dim); font-size: 0.95rem; }
+.tool-field-label { font-family: var(--caps); color: var(--gold-dim); letter-spacing: 0.08em; font-size: 0.72rem; }
+
+/* Buttons: the game's grey stone buttons with gold letters; main actions in its red */
+.tool-btn, .hud-btn, .logout-link, .hud-tab {
+  font-family: var(--caps);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  text-shadow: 1px 1px 0 #000;
+  background: linear-gradient(#6c6c76, #4a4a53);
+  border: 2px solid;
+  border-color: var(--stone-hi) var(--stone-lo) var(--stone-lo) var(--stone-hi);
+  border-radius: 0;
+  box-shadow: none;
+  text-transform: uppercase;
+}
+.tool-btn:hover, .hud-btn:hover, .logout-link:hover, .hud-tab:hover {
+  color: #fff3b8;
+  background: linear-gradient(#7c7c87, #575761);
+  border-color: var(--stone-hi) var(--stone-lo) var(--stone-lo) var(--stone-hi);
+}
+.tool-btn:active, .hud-tab:active { border-color: var(--stone-lo) var(--stone-hi) var(--stone-hi) var(--stone-lo); }
+.hud-tab.active, #journal-find, .tool-btn.dg-on {
+  background: linear-gradient(var(--red-hi), var(--red));
+  border-color: #d8605a #4a0c08 #4a0c08 #d8605a;
+  color: var(--gold);
+}
+.hud-btn { display: block; text-align: center; }
+.filter-bar { border-bottom: 2px solid rgba(0, 0, 0, 0.5); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06); }
+
+/* Fields: parchment to write on */
+.tool-text-input, .tool-select, .tool-textarea {
+  font-family: var(--serif);
+  font-size: 1.02rem;
+  color: var(--ink);
+  background: #e7d4a8 url("img/ui/parchment.png");
+  background-size: cover;
+  border: 2px solid;
+  border-color: var(--stone-lo) var(--stone-hi) var(--stone-hi) var(--stone-lo);
+  border-radius: 0;
+}
+.tool-text-input::placeholder, .tool-textarea::placeholder { color: #7a6448; font-style: italic; }
+.tool-text-input:focus, .tool-select:focus, .tool-textarea:focus { outline: 2px solid var(--gold); outline-offset: 1px; border-color: var(--stone-lo); }
+.tool-check { font-family: var(--serif); color: var(--text); font-size: 1rem; }
+.tool-check input { accent-color: var(--red); }
+
+/* "I am in" box: a recessed stone panel */
+.dg-here { background: rgba(0, 0, 0, 0.35); border: 2px solid; border-color: var(--stone-lo) var(--stone-hi) var(--stone-hi) var(--stone-lo); }
+.dg-here-region { color: var(--gold-dim); font-family: var(--caps); font-size: 0.8rem; }
+
+/* Autocomplete: a small parchment list */
+.dg-suggest { background: #e7d4a8 url("img/ui/parchment.png"); background-size: cover; border: 2px solid var(--ink-soft); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6); }
+.dg-suggest-name { color: var(--ink); font-family: var(--serif); font-weight: 600; }
+.dg-suggest-meta { color: var(--ink-soft); font-family: var(--serif); font-style: italic; }
+.dg-suggest li.active, .dg-suggest li:hover { background: rgba(122, 24, 16, 0.16); }
+
+/* Cards: logbook parchment, dark ink */
+.dg-card {
+  color: var(--ink);
+  background: #c99a5f url("img/ui/parchment.png");
+  background-size: cover;
+  border: 2px solid #5a3a1a;
+  box-shadow: inset 0 0 24px rgba(90, 50, 15, 0.35), 0 4px 12px rgba(0, 0, 0, 0.55);
+  font-family: var(--serif);
+}
+.dg-card-name { color: var(--ink-red); font-family: var(--caps); font-weight: 700; font-size: 1.12rem; }
+.dg-card-meta { color: var(--ink-soft); font-size: 0.95rem; }
+.dg-card-trip { color: var(--ink); font-size: 1rem; }
+.dg-card-note { color: var(--ink-red); font-style: italic; font-size: 0.95rem; }
+.dg-card .dg-dim, .dg-card .dg-dim * { color: var(--ink-soft); }
+.dg-card .dg-good { color: #1f5f24; font-weight: 600; }
+.dg-card .dg-warn { color: #8a4a00; font-weight: 600; }
+.dg-card .dg-bad { color: #9c1c12; font-weight: 600; }
+.dg-card .dg-num { font-family: var(--serif); }
+.dg-card .tool-btn { font-size: 0.72rem; }
+.dg-card-house { border-color: var(--ink-red); }
+.dg-tag { font-family: var(--caps); font-size: 0.66rem; letter-spacing: 0.05em; color: var(--gold); border-color: var(--gold-dim); background: rgba(0, 0, 0, 0.25); }
+.dg-card .dg-tag { color: var(--ink); border-color: var(--ink-soft); background: rgba(255, 245, 215, 0.35); }
+.dg-card .dg-tag-warn, .dg-tag-warn { color: var(--ink-red); border-color: var(--ink-red); }
+.dg-quest-detail .dg-tag-warn { color: #ffb3a0; border-color: #d8605a; }
+.dg-tag-good { color: #1f5f24 !important; border-color: #1f5f24 !important; }
+.dg-alts summary, .dg-card summary { color: var(--ink-soft); }
+.dg-card .dg-link { color: var(--ink); text-decoration-color: var(--ink-soft); }
+.dg-card .dg-link:hover { color: var(--ink-red); }
+.dg-card h3 { font-family: var(--caps); color: var(--ink-red); font-size: 0.95rem; letter-spacing: 0.06em; }
+
+/* The recognised quest: a scroll with the logbook's rollers top and bottom */
+.dg-quest-match { position: relative; margin: 14px 4px; padding-top: 22px; padding-bottom: 22px; border-width: 0 2px; }
+.dg-quest-match::before, .dg-quest-match::after {
+  content: ""; position: absolute; left: -10px; right: -10px; height: 16px;
+  background: url("img/ui/scroll-top.png") center / 100% 100% no-repeat; image-rendering: pixelated;
+}
+.dg-quest-match::before { top: -8px; }
+.dg-quest-match::after { bottom: -8px; background-image: url("img/ui/scroll-bottom.png"); }
+.dg-quest-match .dg-reward-label { color: var(--ink-red); }
+
+/* Reward box: a sealed notice */
+.dg-reward { border: 3px double var(--ink-red); background: rgba(255, 240, 205, 0.35); color: var(--ink); }
+.dg-quest-detail .dg-reward { background: #c99a5f url("img/ui/parchment.png"); background-size: cover; }
+.dg-reward-other { border-color: #9c1c12; background: rgba(255, 210, 180, 0.45); }
+.dg-reward-label { font-family: var(--caps); color: var(--ink-red); letter-spacing: 0.12em; }
+.dg-reward-who { font-family: var(--caps); color: var(--ink); font-size: 1.12rem; }
+.dg-reward-items { font-family: var(--serif); color: var(--ink-soft); }
+.dg-cast { color: var(--ink); }
+.dg-deadline { border: 1px dashed var(--ink-soft); background: rgba(255, 245, 215, 0.25); color: var(--ink); }
+
+/* Quest walkthrough (on stone): journal passages in parchment */
+.dg-quest-title { font-family: var(--caps); color: var(--gold); text-shadow: 1px 1px 0 #000; font-size: 1.35rem; }
+.dg-quest-detail h3 { font-family: var(--caps); color: var(--gold); letter-spacing: 0.08em; }
+.dg-steps { font-size: 1.02rem; color: var(--text); }
+.dg-journal {
+  color: var(--ink); font-size: 1.02rem; line-height: 1.6; border: none; padding: 12px 16px;
+  background: #c99a5f url("img/ui/parchment.png"); background-size: cover;
+  box-shadow: inset 0 0 20px rgba(90, 50, 15, 0.35);
+}
+.dg-chip { color: var(--ink-red); border-bottom: 1px dotted var(--ink-red); font-style: italic; }
+.dg-chip-filled { color: #1f4f8f; border-bottom: 2px solid #1f4f8f; font-style: normal; font-weight: 700; }
+.dg-filled-note { color: #9fc4ff; font-family: var(--serif); font-style: italic; }
+.dg-quest-detail summary { color: var(--gold-dim); font-family: var(--caps); font-size: 0.8rem; letter-spacing: 0.06em; }
+
+/* Lists on stone */
+.dg-list { border: 2px solid; border-color: var(--stone-lo) var(--stone-hi) var(--stone-hi) var(--stone-lo); background: rgba(0, 0, 0, 0.35); }
+.dg-list-item { color: var(--text); border-bottom-color: rgba(255, 255, 255, 0.07); font-family: var(--serif); }
+.dg-list-title { font-size: 1rem; }
+.dg-list-meta { color: var(--text-dim); font-style: italic; font-size: 0.82rem; }
+.dg-list-item:hover { background: rgba(242, 205, 82, 0.08); }
+.dg-list-item.dg-on { background: rgba(140, 28, 19, 0.55); }
+.dg-list-item.dg-on .dg-list-title { color: var(--gold); }
+.dg-link { color: var(--text); text-decoration-color: var(--gold-dim); font-family: var(--serif); font-size: 1rem; }
+.dg-link:hover, .dg-link.dg-on { color: var(--gold); }
+.dg-bgroup h3 { font-family: var(--caps); color: var(--gold); font-size: 0.85rem; letter-spacing: 0.06em; }
+.dg-dim { color: var(--text-dim); }
+.dg-good { color: #9fe39a; }
+.dg-warn { color: #f0b45a; }
+.dg-bad { color: #ff8a7a; }
+
+/* Map and town sketch in stone frames */
+.dg-map-wrap, .dg-town-map { border: 4px solid; border-color: var(--stone-lo) var(--stone-hi) var(--stone-hi) var(--stone-lo); background: #0d0d10; }
+.dg-map-title { font-family: var(--caps); color: var(--gold); text-shadow: 1px 1px 0 #000; font-size: 1.05rem; }
+.dg-map-tip { background: #e7d4a8 url("img/ui/parchment.png"); background-size: cover; color: var(--ink); border: 1px solid var(--ink-soft); font-family: var(--serif); font-size: 0.9rem; }
+.dg-legend { color: var(--text-dim); font-family: var(--serif); font-size: 0.9rem; }
+.dg-legend-dot { outline: 1px solid rgba(0, 0, 0, 0.6); }
+
+.dg-credits { font-family: var(--serif); color: var(--text-dim); font-size: 0.85rem; }
+.dg-credits a { color: var(--gold); }
+code { color: var(--gold); }
+.dg-card .dg-steps, .dg-card .dg-steps li { color: var(--ink); }
+/* the rollers overhang the scroll a little, never the page */
+.dg-quest-match { margin: 14px 6px; }
+.dg-quest-match::before, .dg-quest-match::after { left: -6px; right: -6px; }
+@media (max-width: 560px) {
+  .callsign-row { flex-wrap: wrap; gap: 8px; }
+  .callsign { flex: 1 0 100%; }
+  .nav-links { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
+  .nav-links .logout-link { font-size: 0.66rem; }
+}

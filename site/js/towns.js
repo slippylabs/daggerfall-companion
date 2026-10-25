@@ -1,7 +1,7 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=2';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=2';
-import { state } from './state.js?v=2';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=3';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=3';
+import { state } from './state.js?v=3';
 
 const $ = id => document.getElementById(id);
 const canvas = $('town-canvas'), ctx = canvas.getContext('2d');
@@ -86,7 +86,7 @@ function drawMap() {
   const size = Math.max(240, Math.min(wrap.clientWidth, 520));
   canvas.width = canvas.height = Math.round(size * devicePixelRatio);
   canvas.style.width = canvas.style.height = `${size}px`;
-  ctx.fillStyle = '#050b10';
+  ctx.fillStyle = '#0d0d10';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (!current?.town) return;
   const { town, file } = current;
@@ -120,16 +120,16 @@ function drawMap() {
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2.5 * devicePixelRatio;
     ctx.beginPath(); ctx.arc(hl.x, hl.y, r * 3, 0, Math.PI * 2); ctx.stroke();
-    ctx.font = `${12 * devicePixelRatio}px Consolas, monospace`;
+    ctx.font = `600 ${14 * devicePixelRatio}px 'EB Garamond', Georgia, serif`;
     const w = ctx.measureText(hl.name).width;
     const lx = Math.min(hl.x + r * 3 + 4, canvas.width - w - 10);
-    ctx.fillStyle = 'rgba(5,11,16,0.85)';
+    ctx.fillStyle = 'rgba(231,212,168,0.95)';
     ctx.fillRect(lx - 4, hl.y - 10 * devicePixelRatio, w + 8, 18 * devicePixelRatio);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#2a1a0b';
     ctx.fillText(hl.name, lx, hl.y + 4 * devicePixelRatio);
   }
   ctx.fillStyle = 'rgba(217,251,232,0.8)';
-  ctx.font = `bold ${12 * devicePixelRatio}px Consolas, monospace`;
+  ctx.font = `bold ${12 * devicePixelRatio}px 'EB Garamond', Georgia, serif`;
   ctx.fillText('N ↑', canvas.width - 40 * devicePixelRatio, 16 * devicePixelRatio);
 }
 

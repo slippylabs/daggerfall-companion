@@ -1,7 +1,7 @@
 // Quests tab: every quest script as a walkthrough - what it asks, the time limit, and who pays.
-import { loadQuests, normalise } from './data.js?v=2';
-import { el, fill } from './ui.js?v=2';
-import { templateSegments, stepText, rewardGivers } from './questText.js?v=2';
+import { loadQuests, normalise } from './data.js?v=3';
+import { el, fill } from './ui.js?v=3';
+import { templateSegments, stepText, rewardGivers } from './questText.js?v=3';
 
 const $ = id => document.getElementById(id);
 let quests = null, selected = null, tabs = null;
@@ -86,7 +86,7 @@ function show(x, names = null, days = null) {
   const complete = x.templates.find(t => t.kind === 'complete' && t.v === 0);
   fill($('quest-detail'),
     el('h2', { class: 'dg-quest-title', text: x.title || x.file }),
-    names ? el('p', { class: 'dg-filled-note', text: 'Filled in from your journal: green words are your quest\'s real names.' }) : null,
+    names ? el('p', { class: 'dg-filled-note', text: 'Filled in from your journal: the underlined blue words are your quest\'s real names.' }) : null,
     el('div', { class: 'dg-quest-facts' },
       x.list ? el('span', { class: 'dg-tag', text: `${guildName(x.list.group)} · ${memberWord(x.list)}` }) : null,
       x.list?.minReq ? el('span', { class: 'dg-tag', text: x.list.minReq < 10 ? `rank ${x.list.minReq}+` : `reputation ${x.list.minReq}+` }) : null,
