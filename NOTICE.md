@@ -13,6 +13,12 @@ file readers and its travel-map constants, and `site/js/vendor/travelCore.js` is
 
     MIT License, Copyright (c) 2026 Lattymoy
 
+**Basic Roads** by Hazelnut (https://github.com/ajrb/dfunity-mods, BasicRoads/; Nexus mod 134).
+`site/data/roads.bin` holds its road, track, river and stream map data, the same files DFO Online
+draws its roads from (byte-identical, sha256 checked by `tools/build-roads.mjs`). The mod's code is
+MIT, Copyright (C) 2020 Hazelnut; the data is Hazelnut's and contributors' hand-made work, credited
+here with thanks.
+
 **Daggerfall Unity** (https://github.com/Interkarma/daggerfall-unity). The quest scripts, the
 travel time formula and the map-dot layout come from it, through DFO Online.
 

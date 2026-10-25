@@ -1,8 +1,8 @@
 // Map tab: the game's own travel-map art. World view = TRAV0I00 (click a region);
 // region view = its FMAP page(s) with every location dot placed by the game's own law.
-import { data, regionName, typeWord, searchLocations, travelBetween } from './data.js?v=6';
-import { el, fill, autocomplete, locationCard } from './ui.js?v=6';
-import { state, registerMap, onChange } from './state.js?v=6';
+import { data, regionName, typeWord, searchLocations, travelBetween, loadRoads } from './data.js?v=7';
+import { el, fill, autocomplete, locationCard } from './ui.js?v=7';
+import { state, registerMap, onChange } from './state.js?v=7';
 
 const $ = id => document.getElementById(id);
 const canvas = $('map-canvas'), ctx = canvas.getContext('2d');
@@ -15,7 +15,71 @@ const LEGEND = [
   ['City / town / village', 11], ['Dungeon', 1], ['Temple / shrine', 8], ['Tavern', 10], ['Farm / manor / cottage', 5], ['Graveyard / coven', 3],
 ];
 
+// Roads, tracks, rivers and streams (Basic Roads by Hazelnut, as in DFO Online), colours as the game's
+// travel map draws them; a toggle in the legend, remembered in this browser
+const PATHS = [  // [layer, colour, width in map pixels], drawn bottom to top
+  [3, 'rgb(48,120,230)', 0.22], [1, 'rgb(160,118,74)', 0.26], [2, 'rgb(48,79,250)', 0.34], [0, 'rgb(60,60,60)', 0.34],
+];
+const DIRS = [[128, 0, -1], [64, 1, -1], [32, 1, 0], [16, 1, 1], [8, 0, 1], [4, -1, 1], [2, -1, 0], [1, -1, -1]];
+let showRoads = true;
+try { showRoads = localStorage.getItem('dg-roads') !== '0'; } catch { /* storage blocked: roads on */ }
+const roadPaths = new Map();
+
+// A map pixel's place on a region page, by the same law as the dots (bottom-up texture offset x scale)
+function pagePos(p, mx, my) {
+  const W = data.dots.regionWidth, H = data.dots.regionHeight;
+  const x = mx - p.origin[0], y = my - p.origin[1];
+  if (x < 0 || y < 0 || x >= W || y >= H) return null;
+  if (p.scale === 1) return [x, y];
+  if (data.politic[my * 1000 + mx] - 128 !== view.region) return null;
+  const offset = Math.trunc((((H - y - 1) * W) + x) * p.scale);
+  if (offset >= W * H) return null;
+  return [offset % W, H - 1 - Math.floor(offset / W)];
+}
+
+// One Path2D per layer for a page, in page pixels: each pixel draws half-way to the neighbours it joins
+function pathsFor(p) {
+  const key = p.image;
+  if (roadPaths.has(key)) return roadPaths.get(key);
+  const N = 500000, out = PATHS.map(() => new Path2D());
+  const W = data.dots.regionWidth, H = data.dots.regionHeight;
+  for (let y = p.origin[1]; y < p.origin[1] + H && y < 500; y++) {
+    for (let x = p.origin[0]; x < p.origin[0] + W && x < 1000; x++) {
+      const i = y * 1000 + x;
+      PATHS.forEach(([layer], k) => {
+        const bits = data.roads[layer * N + i];
+        if (!bits) return;
+        const a = pagePos(p, x, y);
+        if (!a) return;
+        for (const [bit, dx, dy] of DIRS) {
+          if (!(bits & bit)) continue;
+          const b = pagePos(p, x + dx, y + dy) || [a[0] + dx, a[1] + dy];
+          out[k].moveTo(a[0] + 0.5, a[1] + 0.5);
+          out[k].lineTo((a[0] + b[0]) / 2 + 0.5, (a[1] + b[1]) / 2 + 0.5);
+        }
+      });
+    }
+  }
+  roadPaths.set(key, out);
+  return out;
+}
+
+function drawRoads(p, s) {
+  if (!showRoads || !data.roads) return;
+  const paths = pathsFor(p);
+  ctx.save();
+  ctx.setTransform(s, 0, 0, s, view.ox, view.oy);
+  ctx.lineCap = 'round';
+  PATHS.forEach(([, colour, w], k) => {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = Math.max(w, 1.6 * devicePixelRatio / s);
+    ctx.stroke(paths[k]);
+  });
+  ctx.restore();
+}
+
 export function initMap() {
+  loadRoads().then(draw, () => { /* the map works without roads */ });
   img('overworld.png').onload = draw;
   const regionSel = $('map-region');
   regionSel.append(el('option', { value: -1 }, 'All regions'),
@@ -61,7 +125,16 @@ export function initMap() {
   new ResizeObserver(() => { fit(); draw(); }).observe(canvas.parentElement);
 
   fill($('map-legend'), ...LEGEND.map(([label, c]) =>
-    el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-dot', style: `background:${data.dots.dotColors[c]}` }), label)));
+    el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-dot', style: `background:${data.dots.dotColors[c]}` }), label)),
+  el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-line', style: 'background:rgb(60,60,60)' }), 'Road'),
+  el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-line', style: 'background:rgb(160,118,74)' }), 'Dirt track'),
+  el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-line', style: 'background:rgb(48,79,250)' }), 'River'),
+  el('label', { class: 'tool-check dg-legend-item dg-roads-toggle' },
+    el('input', { type: 'checkbox', id: 'map-roads', checked: showRoads, onchange: e => {
+      showRoads = e.target.checked;
+      try { localStorage.setItem('dg-roads', showRoads ? '1' : '0'); } catch { /* kept for this visit */ }
+      draw();
+    } }), ' Show roads'));
 
   onChange(() => { if (view.selected >= 0) renderDetail(); draw(); });
   registerMap({ select });
@@ -215,6 +288,7 @@ function draw() {
   if (!image.complete) { image.onload = draw; return; }
   const s = scale();
   ctx.drawImage(image, view.ox, view.oy, 320 * s, 160 * s);
+  drawRoads(p, s);
 
   // routes follow the pixels the travel law charges (scale-1 pages only): a planned trip leg by leg,
   // or the single trip from where the player is to the selection

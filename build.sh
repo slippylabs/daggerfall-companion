@@ -7,6 +7,7 @@ node tools/build-data.mjs
 node tools/build-images.mjs
 node tools/build-towns.mjs
 node tools/build-quests.mjs
+node tools/build-roads.mjs
 node tools/build-ui.mjs
 node tools/verify.mjs
 node tools/test-recognise.mjs

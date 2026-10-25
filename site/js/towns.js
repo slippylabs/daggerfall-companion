@@ -1,7 +1,7 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=6';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=6';
-import { state } from './state.js?v=6';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=7';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=7';
+import { state } from './state.js?v=7';
 
 const $ = id => document.getElementById(id);
 const canvas = $('town-canvas'), ctx = canvas.getContext('2d');

@@ -101,6 +101,15 @@ def run(base, width, height, mobile):
         page.wait_for_timeout(800)
         check('Ruins of Wickston Manor' in page.inner_text('#map-detail'), f'[{tag}] "Show on map" selects the dungeon')
         check(page.inner_text('#map-title') == 'Daggerfall', f'[{tag}] map opens the Daggerfall region page')
+        road_px = '''() => { const c = document.querySelector('#map-canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+          let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] === 60 && d[i + 1] === 60 && d[i + 2] === 60) n++; return n; }'''
+        page.wait_for_function(f'({road_px})() > 500')
+        roads_on = page.evaluate(road_px)
+        page.click('label:has(#map-roads)')
+        page.wait_for_timeout(200)
+        roads_off = page.evaluate(road_px)
+        check(roads_on > 500 and roads_off < roads_on / 10, f'[{tag}] roads drawn on the region map, and the toggle hides them ({roads_on} -> {roads_off} px)')
+        page.click('label:has(#map-roads)')
         page.screenshot(path=str(SHOTS / f'map_{tag}.png'), full_page=True)
 
         # Map search

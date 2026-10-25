@@ -238,3 +238,7 @@ code { color: var(--gold); }
 .dg-step input { width: 20px; height: 20px; flex: none; accent-color: var(--ink-red); }
 .dg-step-done { text-decoration: line-through; opacity: 0.65; }
 .dg-mine-done .dg-card-name::after { content: " — reward left"; font-size: 0.8em; color: var(--ink-red); }
+/* Map: road legend + toggle */
+.dg-legend-line { display: inline-block; width: 18px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.dg-roads-toggle { min-height: 40px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.dg-roads-toggle input { width: 20px; height: 20px; }

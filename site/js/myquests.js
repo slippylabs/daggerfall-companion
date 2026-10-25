@@ -1,12 +1,12 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=6';
-import { el, fill } from './ui.js?v=6';
-import { state, onChange, showOnMap } from './state.js?v=6';
-import { rewardGivers, nameFor, stepText } from './questText.js?v=6';
-import { showQuest } from './quests.js?v=6';
-import { planRoute } from './route.js?v=6';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=7';
+import { el, fill } from './ui.js?v=7';
+import { state, onChange, showOnMap } from './state.js?v=7';
+import { rewardGivers, nameFor, stepText } from './questText.js?v=7';
+import { showQuest } from './quests.js?v=7';
+import { planRoute } from './route.js?v=7';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
