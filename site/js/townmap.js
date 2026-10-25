@@ -3,7 +3,8 @@
 // other byte a building of type byte-1. Blocks go north row first (as DFO exteriorAutomapWindow.js lays them),
 // so the image is the town north-up, 64 pixels a block. A building's anchor is
 // (bx*64 + x/102.4*64, h*64-1 - (by*64 + z/102.4*64)); its footprint is the patch of its byte around that.
-import { el, fill } from './ui.js?v=15';
+// Only bytes in a group (groupOfByte) are drawn; the rest is scenery, shown as the open ground around it.
+import { el, fill } from './ui.js?v=16';
 
 const PX = 64, BLOCK = 102.4;
 const blocks = {};
@@ -17,7 +18,7 @@ export function townMap(box, { colours, groupOfByte, onPick }) {
   const tip = el('div', { class: 'dg-tmap-tip', hidden: true });
   const frame = el('div', { class: 'dg-tmap-frame' }, canvas, tip);
   const legend = el('div', { class: 'dg-legend dg-tmap-legend' },
-    ...[['temple', 'Temples & guilds'], ['shop', 'Shops'], ['tavern', 'Taverns'], ['house', 'Houses'], ['wall', 'City wall'], ['street', 'Streets']]
+    ...[['temple', 'Temples & guilds'], ['shop', 'Shops'], ['tavern', 'Taverns'], ['house', 'Houses'], ['grounds', 'Graveyards & gardens'], ['wall', 'City wall'], ['street', 'Streets']]
       .map(([g, label]) => el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-dot', style: `background:${colours[g]}` }), label)));
   const zoomOut = el('button', { class: 'tool-btn', 'aria-label': 'Zoom out', onclick: () => zoom(1 / 1.5) }, '−');
   const zoomIn = el('button', { class: 'tool-btn', 'aria-label': 'Zoom in', onclick: () => zoom(1.5) }, '+');
@@ -43,7 +44,7 @@ export function townMap(box, { colours, groupOfByte, onPick }) {
         }
     };
     if (b.byte) look(v => v === b.byte, 6);
-    if (!seed) look(v => v > 0 && v !== 0xfb, 3);
+    if (!seed) look(v => !!groupOfByte[v], 3);
     if (!seed) return null;
     const out = new Set(), stack = [[seed[0], seed[1]]], v = seed[2];
     while (stack.length && out.size < 4000) {
@@ -64,13 +65,29 @@ export function townMap(box, { colours, groupOfByte, onPick }) {
     // outside the city wall: the open ground of the WALL blocks reachable from the map's edge without crossing
     // the wall is countryside, not street
     const blockOf = (x, y) => (town.h - 1 - Math.floor(y / PX)) * town.w + Math.floor(x / PX);
+    // ...and so is every other block beyond the wall ring (the empty corners, farms outside): the blocks reachable
+    // from the grid's edge without stepping on a WALL block
+    const beyond = new Set();
+    if (wallBlock.size) {
+      const stack = [];
+      const visit = (bx, by) => {
+        if (bx < 0 || by < 0 || bx >= town.w || by >= town.h) return;
+        const i = by * town.w + bx;
+        if (beyond.has(i) || wallBlock.has(i)) return;
+        beyond.add(i); stack.push([bx, by]);
+      };
+      for (let bx = 0; bx < town.w; bx++) { visit(bx, 0); visit(bx, town.h - 1); }
+      for (let by = 0; by < town.h; by++) { visit(0, by); visit(town.w - 1, by); }
+      while (stack.length) { const [bx, by] = stack.pop(); visit(bx + 1, by); visit(bx - 1, by); visit(bx, by + 1); visit(bx, by - 1); }
+    }
     const outside = new Uint8Array(W * H);
     if (wallBlock.size) {
       const stack = [];
       const push = (x, y) => {
         if (x < 0 || y < 0 || x >= W || y >= H) return;
         const k = y * W + x;
-        if (outside[k] || !wallBlock.has(blockOf(x, y)) || (bytes[k] !== 0 && bytes[k] !== 0xfb)) return;
+        const bi = blockOf(x, y);
+        if (outside[k] || !(wallBlock.has(bi) || beyond.has(bi)) || groupOfByte[bytes[k]]) return;
         outside[k] = 1; stack.push(k);
       };
       for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
@@ -151,7 +168,7 @@ export function townMap(box, { colours, groupOfByte, onPick }) {
     let best = null, bestD = 7;
     for (const b of named) {
       const [ax, ay] = anchor(b);
-      const d = Math.hypot(ax - px, ay - py) - (v > 0 && v !== 0xfb && byteAt(ax, ay) === v ? 3 : 0);
+      const d = Math.hypot(ax - px, ay - py) - (groupOfByte[v] && byteAt(ax, ay) === v ? 3 : 0);
       if (d < bestD) { bestD = d; best = b; }
     }
     return best;

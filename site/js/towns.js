@@ -1,26 +1,17 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=15';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=15';
-import { state } from './state.js?v=15';
-import { showDungeon, dungeonBlocks } from './dungeon.js?v=15';
-import { townMap } from './townmap.js?v=15';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=16';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=16';
+import { state } from './state.js?v=16';
+import { showDungeon, dungeonBlocks } from './dungeon.js?v=16';
+import { townMap } from './townmap.js?v=16';
+import { TOWN_COLOURS, GROUP_OF_BYTE } from './townBytes.js?v=16';
 
 const $ = id => document.getElementById(id);
 const BLOCK = 102.4;   // one RMB block is 4096 Daggerfall units = 102.4 m
 let current = null, highlight = null, mark = null, tabs = null;
 const HOUSE = 5;   // houses: [blockX, blockY, x, z, buildingKey] per house
 
-// Daggerfall's own town-map colours by building group (DFU automap settings, as DFO townQuarters.js has them);
-// the list's group dots use the same, so a colour on the map is the colour in the list
-const TOWN_COLOURS = { temple: '#c37d45', shop: '#1855be', tavern: '#307555', house: '#283c45', wall: '#1b1d22', street: '#cfb07a', select: '#f2cd52' };
-const GROUP_OF_BYTE = (() => {
-  const g = new Array(256).fill('house');
-  g[0] = null; g[0xfb] = null;
-  for (const v of [1, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14]) g[v] = 'shop';
-  for (const v of [12, 15]) g[v] = 'temple';
-  g[16] = 'tavern';
-  return g;
-})();
+// the list's group dots use the town map's colours (townBytes.js), so a colour on the map is the colour in the list
 // a building type's colour: its automap byte is the type's number + 1
 const colourFor = (file, t) => {
   const v = Object.entries(file.buildingTypes).find(([, n]) => n === t)?.[0];

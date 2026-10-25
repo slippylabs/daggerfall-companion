@@ -13,6 +13,7 @@ node tools/build-walk.mjs
 node tools/build-names.mjs
 node tools/build-ui.mjs
 node tools/verify.mjs
+node tools/test-townmap.mjs
 node tools/test-recognise.mjs
 node tools/test-route.mjs
 node tools/test-save.mjs
