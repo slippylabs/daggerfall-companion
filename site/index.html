@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=UnifrakturMaguntia&display=swap">
 <link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="daggerfall.css?v=12">
+<link rel="stylesheet" href="daggerfall.css?v=13">
 <script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
 (function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
 </head>
@@ -151,8 +151,9 @@
     </section>
 
     <!-- My quests -->
+    <p id="sync-status" class="tool-note dg-sync-status" role="status" hidden></p>
     <section id="tab-mine" class="dg-tab" role="tabpanel" hidden>
-      <p class="tool-note">The quests you are on, kept in this browser. Load them from your game save (below), and load it again after you play to bring them up to date. Every trip is timed from "I am in" above.</p>
+      <p class="tool-note">Every quest you are on, with exactly where to go now and what comes next. Sync again after you play to bring it up to date.</p>
       <div id="mine-list" class="dg-results"></div>
     </section>
 
@@ -169,7 +170,7 @@
   </div>
 </main>
 
-<script type="module" src="js/app.js?v=9"></script>
+<script type="module" src="js/app.js?v=10"></script>
 <!-- Slippy Deck: floating Slippy TV + jukebox player. Renders nothing unless admin.slippylabs.com/whoami confirms a signed-in account. -->
 <script defer src="https://slippylabs.com/deck/deck.js"></script>
 <!-- Slippy Labs sitewide privacy link. Self-contained on purpose: these sites

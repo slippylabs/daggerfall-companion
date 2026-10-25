@@ -166,6 +166,7 @@ def run(base, width, height, mobile):
         check('Ruins of Wickston Manor' in mine and 'longer than the time left' in mine,
               f'[{tag}] My quests: the Lycanthrope trip is flagged as longer than the 5 days left')
         check('my quests (2)' in page.inner_text('.hud-tab[data-tab="mine"]').lower(), f'[{tag}] tab shows the count')
+        page.click('#mine-list .dg-planner > summary')
         plan = page.inner_text('#mine-list .dg-planner')
         check('Ruins of Wickston Manor' in plan and 'after its days run out' in plan and 'Total:' in plan,
               f'[{tag}] route planner orders the stops and flags the late dungeon')
@@ -184,6 +185,7 @@ def run(base, width, height, mobile):
         page.wait_for_timeout(300)
         lyc = page.locator('#mine-list .dg-mine:has-text("Hunt for a Lycanthrope")')
         check('claim your reward' in lyc.inner_text() and 'dg-mine-done' in lyc.get_attribute('class'), f'[{tag}] job done: next step is claiming the reward')
+        page.click('#mine-list .dg-planner > summary')
         check('Ruins of Wickston Manor' not in page.inner_text('#mine-list .dg-planner'), f'[{tag}] job done: the dungeon leaves the route')
         page.reload()
         page.wait_for_selector('#mine-list .dg-mine')
@@ -201,45 +203,55 @@ def run(base, width, height, mobile):
         check(page.locator('#mine-list .dg-mine').count() == 1, f'[{tag}] Done removes a quest')
 
         # Load from the game: DFO Online's "Export all saves" zip with two saves; pick the newest
-        page.click('#mine-list .dg-import > summary') if not page.locator('#mine-list .dg-import[open]').count() else None
-        page.set_input_files('#save-file', str(Path(__file__).resolve().parent / 'fixtures' / 'DFO-Online-Saves.zip'))
+        zip_path = str(Path(__file__).resolve().parent / 'fixtures' / 'DFO-Online-Saves.zip')
+        page.set_input_files('#save-file', zip_path)
         page.wait_for_selector('#mine-list .dg-save-pick')
         picks = page.locator('#mine-list .dg-save-pick')
-        check(picks.count() == 2 and 'hunt done' in picks.nth(0).inner_text().lower(), f'[{tag}] save file: two saves offered, newest first')
+        check(picks.count() == 2 and 'beast slain' in picks.nth(0).inner_text().lower(), f'[{tag}] save file: two saves offered, newest first')
         picks.nth(0).click()
         page.wait_for_selector('#mine-list .dg-import-msg b')
         msg = page.inner_text('#mine-list .dg-import-msg')
-        check('Loaded 1 quest' in msg and 'Penbrugh' in msg, f'[{tag}] save loaded: 1 quest, "I am in" set from where the game was saved')
+        check('Loaded 2 quests' in msg and 'Penbrugh' in msg, f'[{tag}] save loaded: 2 quests, "I am in" set from where the game was saved')
         check(page.input_value('#here-input') == 'Penbrugh', f'[{tag}] header now says I am in Penbrugh')
-        mine = page.inner_text('#mine-list')
-        check('Bedoryan Kingwing in Daggerfall' in mine and '1 day left' in mine, f'[{tag}] the saved Delivery Boy: payer by name and 1 day left')
-        check('Daggerfall, Daggerfall' in mine and 'Total:' in page.inner_text('#mine-list .dg-planner'), f'[{tag}] trip and route from Penbrugh to Daggerfall')
+        # Do this now: one NOW per quest, exact place and action
+        cards = page.locator('#mine-list .dg-mine-now')
+        check(cards.count() == 2 and page.locator('#mine-list .dg-step-now').count() == 2, f'[{tag}] each quest card shows exactly one NOW')
+        dv = page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-step-now').inner_text()
+        print('  delivery NOW:', dv.replace(chr(10), ' / ')[:200])
+        check('Daggerfall' in dv and 'The Wickford Residence' in dv and 'part of town' in dv and 'Give the book' in dv
+              and 'Bedoryan Kingwing' in dv and 'who pays your reward' in dv, f'[{tag}] Delivery Boy NOW: the exact house, the book and who pays')
+        hn = page.locator('#mine-list .dg-mine-now:has-text("Hunt for a Lycanthrope") .dg-step-now').inner_text()
+        check('Collect your reward from Lord Kain Mastercroft' in hn and 'The Fighters Guild' in hn, f'[{tag}] Hunt (beast slain) NOW: collect the reward at the Fighters Guild')
+        check('away' in dv, f'[{tag}] NOW shows the trip from where you are')
         page.screenshot(path=str(SHOTS / f'save_{tag}.png'), full_page=True)
-        # Where in town: the recipient's house, found by the building key in the save
-        page.click('#mine-list .dg-intown li:has-text("Bedoryan Kingwing") >> text=find it')
+        # NOW's Town map: the recipient's house circled
+        page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-go-town').click()
         page.wait_for_selector('#town-head .dg-town-mark')
         where = page.inner_text('#town-head .dg-town-mark')
-        check('The Wickford Residence' in where and 'part of town' in where, f'[{tag}] find it: the quest house is marked in Daggerfall ({where.splitlines()[-1][:70]})')
+        check('The Wickford Residence' in where and 'part of town' in where, f'[{tag}] Town map: the quest house is marked in Daggerfall ({where.splitlines()[-1][:70]})')
         page.screenshot(path=str(SHOTS / f'house_{tag}.png'), full_page=True)
+        # the older save: the werewolf is alive, so NOW is the kill and THEN the reward
         page.click('.hud-tab[data-tab="mine"]')
         page.wait_for_selector('#mine-list .dg-import')
-        page.set_input_files('#save-file', str(Path(__file__).resolve().parent / 'fixtures' / 'DFO-Online-Saves.zip'))
+        page.set_input_files('#save-file', zip_path)
         page.wait_for_selector('#mine-list .dg-save-pick')
         page.locator('#mine-list .dg-save-pick').nth(1).click()
         page.wait_for_selector('#mine-list .dg-import-msg b')
-        # Where in the dungeon: the werewolf's spot from the save, on the dungeon map
-        page.click('#mine-list .dg-find-dungeon')
+        page.wait_for_timeout(300)
+        hunt = page.locator('#mine-list .dg-mine-now:has-text("Hunt for a Lycanthrope")')
+        hn, ht = hunt.locator('.dg-step-now').inner_text(), hunt.locator('.dg-step-then').inner_text()
+        check('Kill the Werewolf' in hn and 'Ruins of Wickston Manor' in hn and 'Collect your reward' in ht,
+              f'[{tag}] Hunt (beast alive): NOW kill the Werewolf in Ruins of Wickston Manor, THEN the reward')
+        check(page.locator('#mine-list .dg-mine-now').count() == 2, f'[{tag}] loading again refreshes, never doubles')
+        hunt.locator('.dg-go-dungeon').click()
         page.wait_for_selector('#dungeon-view .dg-town-mark')
         spot = page.inner_text('#dungeon-view .dg-town-mark')
         check('of the entrance' in spot and page.locator('#dungeon-view canvas').count() == 1 and page.is_hidden('#town-cols'),
-              f'[{tag}] dungeon map: the quest target is pinned with directions ({spot.splitlines()[1][:80]})')
+              f'[{tag}] Dungeon map: the werewolf is pinned with directions ({spot.splitlines()[1][:80]})')
         check('quest target' in page.inner_text('#dungeon-view .dg-level'), f'[{tag}] dungeon map: the level picker opens on the target level')
         page.screenshot(path=str(SHOTS / f'dungeon_{tag}.png'), full_page=True)
         page.click('.hud-tab[data-tab="mine"]')
         page.wait_for_selector('#mine-list .dg-mine')
-        check(page.locator('#mine-list .dg-mine').count() == 2 and 'Lord Kain Mastercroft in Daggerfall' in page.inner_text('#mine-list')
-              and page.locator('#mine-list .dg-mine-done').count() == 1,
-              f'[{tag}] the older save fills in the hunt (giver by name, ticks kept) without doubling the delivery')
 
         # Layout: no sideways scroll, and at phone width every control is thumb-sized
         overflow = page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
@@ -265,8 +277,83 @@ def run(base, width, height, mobile):
         browser.close()
 
 
-base = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].startswith('http') else serve()
+REALM_ID = 'r' + '0123456789abcdef0123'
+REALM_SAVE = (Path(__file__).resolve().parent / 'fixtures' / 'realm-save.json').read_bytes()
+
+
+def serve_fake_dfo():
+    """A stand-in for daggerfalljs.dev plus DFO's account service on one local origin: a blank page, and
+    GET /v1/realm and /v1/realm/<id>/data that answer only to the Bearer secret."""
+    class H(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            auth = self.headers.get('Authorization') == 'Bearer test-secret'
+            if self.path == '/v1/realm' and auth:
+                body, ctype = (b'{"characters":[{"id":"%s","name":"Slippy","playing":true,"updatedAt":1}],"max":3}' % REALM_ID.encode()), 'application/json'
+            elif self.path == f'/v1/realm/{REALM_ID}/data' and auth:
+                body, ctype = REALM_SAVE, 'application/octet-stream'
+            elif self.path.startswith('/v1/'):
+                self.send_response(401); self.end_headers(); return
+            else:
+                body, ctype = b'<!doctype html><title>fake DFO</title><p>DFO Online</p>', 'text/html'
+            self.send_response(200)
+            self.send_header('Content-Type', ctype)
+            self.end_headers()
+            self.wfile.write(body)
+    httpd = socketserver.TCPServer(('127.0.0.1', 0), H)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return f'http://127.0.0.1:{httpd.server_address[1]}'
+
+
+def run_sync(base):
+    """The Sync bookmark, end to end: js/bookmarklet.js run on a fake DFO page sends the quests to the guide."""
+    dfo = serve_fake_dfo()
+    other = serve_fake_dfo()   # a different origin that must not be listened to
+    guide = f'{base}?dfo={dfo}'
+    code = (SITE / 'js' / 'bookmarklet.js').read_text()
+    code = code.replace("GUIDE = 'https://daggerfall.slippylabs.com/'", f"GUIDE = {guide!r}").replace(r"DFO_HOST = /(^|\.)daggerfalljs\.dev$/", r"DFO_HOST = /^127\.0\.0\.1$/")
+    assert '127' in code.split('\n')[8], 'bookmarklet constants not replaced'
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        for kind in ['realm', 'local']:
+            ctx = browser.new_context(viewport={'width': 1280, 'height': 900})
+            page = ctx.new_page()
+            page.goto(dfo + '/')
+            if kind == 'realm':
+                page.evaluate(f"localStorage.setItem('dagger.account.session', JSON.stringify({{secret: 'test-secret'}})); localStorage.setItem('dagger.account.service', {dfo!r})")
+            else:
+                page.evaluate("([s]) => { localStorage.setItem('dagger.save.0', s); localStorage.setItem('dagger.saveinfo.0', JSON.stringify({characterName: 'Slippy', saveName: 'QuickSave', dateAndTime: {realTime: 5, gameTime: 526410}})); }", [REALM_SAVE.decode()])
+            with page.expect_popup() as pop:
+                page.evaluate(code)
+            g = pop.value
+            g.wait_for_selector('#mine-list .dg-mine-now', timeout=20000)
+            status = g.inner_text('#sync-status')
+            check(g.locator('#mine-list .dg-mine-now').count() == 2 and 'Synced 2 quests' in status,
+                  f'[sync/{kind}] the bookmark sends both quests to the guide ({status})')
+            check('Wickford Residence' in g.inner_text('#mine-list'), f'[sync/{kind}] synced quests carry their exact places')
+            ctx.close()
+        # a page on another origin cannot push quests into the guide
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(other + '/')
+        with page.expect_popup() as pop:
+            page.evaluate(f"window.w = window.open({(guide + '#sync')!r}, 'g')")
+        g = pop.value
+        g.wait_for_selector('#sync-status:not([hidden])')
+        page.evaluate("[0, 300, 900, 1500].forEach(t => setTimeout(() => w.postMessage({type: 'dg-sync', payload: {snap: {quest: {machine: {quests: []}}}}}, '*'), t))")
+        page.wait_for_timeout(2500)
+        check('Waiting' in g.inner_text('#sync-status') and not g.locator('#mine-list .dg-mine-now').count(),
+              '[sync] a message from any other origin is ignored')
+        browser.close()
+
+
+local = not (len(sys.argv) > 1 and sys.argv[1].startswith('http'))
+base = serve() if local else sys.argv[1]
 run(base, 1280, 900, False)
 run(base, 390, 844, True)
+if local:
+    run_sync(base)
 print(f'\n{sum(results)} passed, {len(results) - sum(results)} failed')
 sys.exit(0 if all(results) else 1)

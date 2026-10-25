@@ -267,3 +267,32 @@ code { color: var(--gold); }
 .dg-dungeon-wrap { border: 3px solid var(--stone-lo); box-shadow: 0 0 0 2px var(--stone-hi); touch-action: none; }
 .dg-dungeon-map { display: block; cursor: grab; }
 .dg-town-cols[hidden], .dg-dungeon[hidden] { display: none; }
+/* My quests v2: NOW / THEN */
+.dg-step-block { display: grid; grid-template-columns: 78px 1fr; gap: 10px; padding: 10px 12px; margin-top: 10px; border-left: 4px solid var(--ink-soft); color: var(--ink); }
+.dg-step-now { background: rgba(140, 28, 19, 0.1); border-left-color: var(--ink-red); }
+.dg-step-then { background: rgba(255, 255, 255, 0.12); }
+.dg-step-label { font-family: var(--caps); font-weight: 700; font-size: 0.85rem; color: var(--ink-red); padding-top: 2px; }
+.dg-step-then .dg-step-label { color: var(--ink-soft); }
+.dg-step-where { font-family: var(--caps); font-size: 1.02rem; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.dg-step-where .dg-tag { margin-left: 8px; }
+.dg-step-trip { font-family: var(--serif); font-weight: 400; color: var(--ink-soft); }
+.dg-step-what { font-size: 1.08rem; margin-top: 3px; line-height: 1.4; }
+.dg-step-now .dg-step-what { font-weight: 600; }
+.dg-step-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.dg-more { margin-top: 10px; color: var(--ink); }
+.dg-more > summary { cursor: pointer; font-family: var(--caps); font-size: 0.8rem; color: var(--ink-soft); min-height: 40px; display: flex; align-items: center; }
+.dg-sync-row { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.dg-sync-setup { text-decoration: none; }
+.dg-import-file { margin-top: 8px; }
+.dg-import-file > summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--ink-soft); }
+.dg-planner-head { cursor: pointer; min-height: 44px; }
+.dg-sync-status { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--gold-dim); background: rgba(0, 0, 0, 0.25); }
+.dg-sync-status.dg-good { color: #9fe39a; }
+.dg-sync-status.dg-bad { color: #ff9a8a; }
+.dg-sync-card h2 { margin: 6px 0 8px; }
+.dg-sync-card p, .dg-sync-card li { color: var(--ink); }
+.dg-bm-row { margin: 14px 0; }
+.dg-bookmarklet { font-size: 1.15rem; padding: 12px 22px; cursor: grab; text-decoration: none; }
+@media (max-width: 560px) {
+  .dg-step-block { grid-template-columns: 1fr; gap: 4px; }
+}

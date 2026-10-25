@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=9';
-import { el, fill } from './ui.js?v=9';
-import { state, onChange, showOnMap, setHere } from './state.js?v=9';
-import { rewardGivers, nameFor, stepText } from './questText.js?v=9';
-import { showQuest } from './quests.js?v=9';
-import { openTown } from './towns.js?v=9';
-import { planRoute } from './route.js?v=9';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=9';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=10';
+import { el, fill } from './ui.js?v=10';
+import { state, onChange, showOnMap, setHere } from './state.js?v=10';
+import { rewardGivers, nameFor, stepText } from './questText.js?v=10';
+import { showQuest } from './quests.js?v=10';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=10';
+import { planRoute } from './route.js?v=10';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=10';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -22,6 +22,8 @@ function save() {
   try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* private mode: kept for this visit */ }
   updateCount();
 }
+
+export const hasQuests = () => list.length > 0;
 
 export function initMyQuests(tabApi) {
   tabs = tabApi;
@@ -91,7 +93,7 @@ export function applySave(found, character) {
       || list.find(x => x.file === f.q.file && x.uid == null && compatible(x.names, f.names));
     if (e) refreshed++;
     else { e = { file: f.q.file, done: [], jobDone: false, saved: Date.now() }; list.unshift(e); added++; }
-    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, spots: f.spots, uid: f.uid, character });
+    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, spots: f.spots, guide: f.guide, uid: f.uid, character, synced: Date.now() });
     e.key = f.q.file + '|' + JSON.stringify(f.names);
     seen.add(e);
   }
@@ -109,6 +111,15 @@ const actions = q => q.steps.map((st, i) => [st, i]).filter(([st]) => ACT.has(st
 // only the reward is left; until then the reward is claimed after the quest's places.
 export function destinations(q, entry) {
   const out = [];
+  if (entry.guide) {
+    // from a save: the open objectives' own places, the reward last
+    for (const o of entry.guide) {
+      if (o.loc === undefined || o.loc === null || o.later) continue;
+      const claim = o.kind === 'reward' || o.payer;
+      if (!out.some(d => d.loc === o.loc && d.claim === claim)) out.push({ label: claim ? `Reward (${o.who || 'the quest giver'})` : sayAction(o, q), loc: o.loc, claim });
+    }
+    return out;
+  }
   const here = state.here;
   const add = (label, name, claim, sym) => {
     const loc = entry.locs?.[sym] ?? locationsNamed(name, here, state.opts)[0];
@@ -138,70 +149,154 @@ async function render() {
   if (!box) return;
   const quests = await loadQuests();
   const byFile = new Map(quests.map(q => [q.file, q]));
+  // the towns the directions point into, so "which part of town" can be told
+  const regions = new Set(list.flatMap(e => (e.guide || []).map(o => o.loc)).filter(l => l != null).map(l => data.locs.region[l]));
+  await Promise.all([...regions].map(r => loadTowns(r).catch(() => null)));
   if (!list.length) {
-    fill(box, importCard(quests), el('p', { class: 'tool-note', text: 'No quests yet. Load them from your game save above, or press "Track" on any quest in the Quests tab.' }));
+    fill(box, syncCard(quests), el('p', { class: 'tool-note', text: 'No quests yet. Sync from the game above, or press "Track" on any quest in the Quests tab.' }));
     return;
   }
-  fill(box, importCard(quests), plannerCard(byFile), ...list.map(entry => {
+  fill(box, syncCard(quests), plannerCard(byFile), ...list.map(entry => {
     const q = byFile.get(entry.file);
     if (!q) return null;
-    const givers = rewardGivers(q, entry.names);
-    const dests = destinations(q, entry);
-    const who = q.reward.automatic ? 'given when the job is done'
-      : givers.map(g => (g.name || (g.questor ? 'the quest giver' : g.role)) + (g.town ? ` in ${g.town}` : '')).join(', or ');
-    const left = el('input', {
-      class: 'tool-number-input dg-days', type: 'number', min: 0, max: 999, value: entry.daysLeft ?? '',
-      placeholder: '–', 'aria-label': 'Game days left',
-      onchange: e => { entry.daysLeft = e.target.value === '' ? null : +e.target.value; save(); render(); },
-    });
-    return el('div', { class: 'dg-card dg-mine' + (entry.jobDone ? ' dg-mine-done' : '') },
-      el('div', { class: 'dg-card-head' },
-        el('span', { class: 'dg-card-name', text: q.title || q.file }),
-        el('span', { class: 'dg-tag', text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'} left` : 'no time limit noted' })),
-      el('div', { class: 'dg-card-meta' }, el('b', { text: 'Claim reward from: ' }), who),
-      progress(q, entry, who),
-      el('ul', { class: 'dg-trips' }, dests.map(d => {
-        const trip = state.here >= 0 && d.loc !== state.here ? travelBetween(state.here, d.loc, state.opts) : null;
-        const late = trip && entry.daysLeft != null && trip.minutes > entry.daysLeft * 1440;
-        return el('li', {},
-          `${d.label}: ${data.locs.name[d.loc]}, ${regionName(data.locs.region[d.loc])} — `,
-          d.loc === state.here ? el('b', { class: 'dg-good', text: 'you are here' })
-            : trip ? el('b', { class: late ? 'dg-bad' : 'dg-num', text: formatDuration(trip.minutes) + (late ? ' (longer than the time left)' : '') })
-              : el('span', { class: 'dg-dim', text: 'set "I am in" for the trip' }),
-          ' ', el('button', { class: 'dg-link', onclick: () => showOnMap(d.loc) }, 'map'));
-      })),
-      dests.length ? null : el('div', { class: 'dg-dim', text: 'No places known yet: load your game save above to fill them in.' }),
-      inTown(q, entry),
-      el('div', { class: 'dg-card-actions' },
-        el('label', { class: 'dg-days-label' }, 'Game days left ', left),
-        el('button', { class: 'tool-btn', onclick: () => showQuest(q, entry.names, entry.days) }, 'Walkthrough'),
-        el('button', { class: 'tool-btn', onclick: () => { list = list.filter(e => e !== entry); save(); render(); } }, 'Done — remove')));
+    return entry.guide ? nowCard(q, entry) : legacyCard(q, entry);
   }));
 }
 
-// ---- load from the game: DFO Online's "Export all saves" zip ----
-let importMsg = null, importOpen = null;
-function importCard(quests) {
+// ---- "Do this now": one exact instruction, then the one after it ----
+const plural = (n, w) => n > 1 ? `${n} ${w}s` : w;
+// what to do, in words
+function sayAction(o, q) {
+  const who = o.who || 'them';
+  switch (o.kind) {
+    case 'talk': return `Talk to ${who}${o.answer === 'yes' ? ' and answer Yes' : ''}`;
+    case 'reward': return o.automatic ? 'Your reward comes the moment the job is done' : `Collect your reward from ${who}`;
+    case 'bring': return `Give ${o.item || 'the quest item'} to ${who}${o.payer ? ', who pays your reward' : ''}`;
+    case 'kill': return o.injure ? `Wound the ${o.who || 'foe'}, but do not kill it` : `Kill ${o.count > 1 ? plural(o.count, o.who || 'foe') : `the ${o.who || 'foe'}`}`;
+    case 'pickup': return `Pick up ${o.item || 'the quest item'}`;
+    case 'drop': return `Drop ${o.item || 'the quest item'} here (inventory → drop)`;
+    case 'use': return `Use ${o.item || 'the quest item'} from your inventory`;
+    case 'cast': return `Cast the spell ${o.spell}`;
+    case 'go': return 'Go there';
+    default: return '';
+  }
+}
+// where, in words: "Daggerfall → The Wickford Residence (north-east part of town)"
+function sayWhere(o) {
+  if (o.loc == null) return null;
+  const town = data.locs.name[o.loc];
+  if (o.building) {
+    const t = data.towns[data.locs.region[o.loc]]?.towns?.[o.loc];
+    const p = t && buildingAt(t, o.building.key);
+    return `${town} → ${o.building.name}${p ? ` (${whereInTown(t, p).replace(/^in the /, '').replace(/, about .*$/, '')})` : ''}`;
+  }
+  if (o.dungeon || o.spot) return `${town}${o.spot ? ' → the marked spot inside' : ' (dungeon)'}`;
+  return town;
+}
+function stepBlock(o, q, label) {
+  const where = sayWhere(o);
+  const trip = o.loc != null && state.here >= 0 && o.loc !== state.here ? travelBetween(state.here, o.loc, state.opts) : null;
+  const buttons = [];
+  if (o.loc != null) {
+    if (o.building) buttons.push(el('button', { class: 'tool-btn dg-go-town', onclick: () => openTown(o.loc, o.building.name, { key: o.building.key }) }, 'Town map'));
+    if (o.spot || o.dungeon) buttons.push(el('button', { class: 'tool-btn dg-go-dungeon', onclick: () => openTown(o.loc, null, { targets: o.spot ? [{ ...o.spot, label: cap(o.who || o.item || 'Here') }] : [] }) }, o.dungeon ? 'Dungeon map' : 'Inside map'));
+    if (o.loc !== state.here) buttons.push(el('button', { class: 'tool-btn dg-go-map', onclick: () => showOnMap(o.loc, null, state.here >= 0 ? [state.here, o.loc] : null) }, 'World map'));
+  }
+  return el('div', { class: `dg-step-block dg-step-${label.toLowerCase()}` },
+    el('div', { class: 'dg-step-label', text: label === 'NOW' ? '▶ NOW' : '▷ THEN' }),
+    el('div', { class: 'dg-step-body' },
+      where ? el('div', { class: 'dg-step-where' }, where,
+        o.loc === state.here ? el('span', { class: 'dg-tag dg-tag-good', text: 'you are here' })
+          : trip ? el('span', { class: 'dg-step-trip', text: ` · ${formatDuration(trip.minutes)} away` }) : null) : null,
+      el('div', { class: 'dg-step-what', text: sayAction(o, q) + '.' + (o.later ? ' (It appears once the step before is done.)' : '') }),
+      label === 'NOW' && buttons.length ? el('div', { class: 'dg-step-buttons' }, ...buttons) : null));
+}
+function nowCard(q, entry) {
+  const g = entry.guide;
+  const head = el('div', { class: 'dg-card-head' },
+    el('span', { class: 'dg-card-name', text: q.title || q.file }),
+    el('span', { class: 'dg-tag' + (entry.daysLeft != null && entry.daysLeft <= 2 ? ' dg-tag-warn' : ''), text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'} left` : 'no time limit' }));
+  const body = !g.length
+    ? el('div', { class: 'dg-step-block dg-step-now' }, el('div', { class: 'dg-step-label', text: '▶ NOW' }),
+      el('div', { class: 'dg-step-body' }, el('div', { class: 'dg-step-what', text: 'Nothing the guide can point to. Check the quest in your journal, or open Details.' })))
+    : [stepBlock(g[0], q, 'NOW'), g[1] ? stepBlock(g[1], q, 'THEN') : null];
+  return el('div', { class: 'dg-card dg-mine dg-mine-now' }, head, body,
+    el('details', { class: 'dg-more' }, el('summary', { text: 'Details' }), ...legacyParts(q, entry)),
+    el('div', { class: 'dg-card-actions' },
+      el('button', { class: 'tool-btn', onclick: () => { list = list.filter(e => e !== entry); save(); render(); } }, 'Done ✓')));
+}
+
+// ---- quests added from the journal or the Quests tab (no save): the full card ----
+function legacyParts(q, entry) {
+  const givers = rewardGivers(q, entry.names);
+  const dests = destinations(q, entry);
+  const who = q.reward.automatic ? 'given when the job is done'
+    : givers.map(g => (g.name || (g.questor ? 'the quest giver' : g.role)) + (g.town ? ` in ${g.town}` : '')).join(', or ');
+  const left = el('input', {
+    class: 'tool-number-input dg-days', type: 'number', min: 0, max: 999, value: entry.daysLeft ?? '',
+    placeholder: '–', 'aria-label': 'Game days left',
+    onchange: e => { entry.daysLeft = e.target.value === '' ? null : +e.target.value; save(); render(); },
+  });
+  return [
+    el('div', { class: 'dg-card-meta' }, el('b', { text: 'Claim reward from: ' }), who),
+    entry.guide ? null : progress(q, entry, who),
+    el('ul', { class: 'dg-trips' }, dests.map(d => {
+      const trip = state.here >= 0 && d.loc !== state.here ? travelBetween(state.here, d.loc, state.opts) : null;
+      const late = trip && entry.daysLeft != null && trip.minutes > entry.daysLeft * 1440;
+      return el('li', {},
+        `${d.label}: ${data.locs.name[d.loc]}, ${regionName(data.locs.region[d.loc])} — `,
+        d.loc === state.here ? el('b', { class: 'dg-good', text: 'you are here' })
+          : trip ? el('b', { class: late ? 'dg-bad' : 'dg-num', text: formatDuration(trip.minutes) + (late ? ' (longer than the time left)' : '') })
+            : el('span', { class: 'dg-dim', text: 'set "I am in" for the trip' }),
+        ' ', el('button', { class: 'dg-link', onclick: () => showOnMap(d.loc) }, 'map'));
+    })),
+    dests.length ? null : el('div', { class: 'dg-dim', text: 'No places known yet: sync from the game to fill them in.' }),
+    inTown(q, entry),
+    el('div', { class: 'dg-card-actions' },
+      el('label', { class: 'dg-days-label' }, 'Game days left ', left),
+      el('button', { class: 'tool-btn', onclick: () => showQuest(q, entry.names, entry.days) }, 'Walkthrough')),
+  ];
+}
+function legacyCard(q, entry) {
+  return el('div', { class: 'dg-card dg-mine' + (entry.jobDone ? ' dg-mine-done' : '') },
+    el('div', { class: 'dg-card-head' },
+      el('span', { class: 'dg-card-name', text: q.title || q.file }),
+      el('span', { class: 'dg-tag', text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'} left` : 'no time limit noted' })),
+    ...legacyParts(q, entry),
+    el('div', { class: 'dg-card-actions' },
+      el('button', { class: 'tool-btn', onclick: () => { list = list.filter(e => e !== entry); save(); render(); } }, 'Done — remove')));
+}
+
+// ---- bring a save in: from the Sync bookmark (postMessage, app.js) or a saves file ----
+let importMsg = null;
+export async function loadSnapshot(snap, info, via) {
+  const [quests, names, individuals] = await Promise.all([loadQuests(), loadNames(), loadIndividuals()]);
+  const { found, unknown } = questsInSave(snap, quests, { names, individuals });
+  const r = applySave(found, info?.characterName ?? null);
+  const at = whereSaved(snap);
+  if (at >= 0) setHere(at);
+  importMsg = [el('b', { class: 'dg-good-ink', text: `${via === 'sync' ? 'Synced' : 'Loaded'} ${found.length} quest${found.length === 1 ? '' : 's'}${info ? ` from ${saveLabel({ info, n: 0 })}` : ''}.` }),
+    ` ${r.added} new, ${r.refreshed} updated${r.finished ? `, ${r.finished} finished and removed` : ''}.`,
+    at >= 0 ? ` "I am in" set to ${data.locs.name[at]}.` : '',
+    unknown.length ? el('div', { class: 'dg-dim', text: `Not in the guide's quest list: ${unknown.join(', ')}` }) : ''];
+  if (state.tab !== 'mine') tabs?.show('mine');
+  await render();
+  return found.length;
+}
+// ---- the top card: Sync from the game (one click), or a saves file ----
+let fileOpen = false;
+function syncCard(quests) {
   const msg = el('div', { class: 'dg-import-msg', 'aria-live': 'polite' });
   if (importMsg) fill(msg, ...importMsg);
   const choose = el('div', { class: 'dg-import-choose' });
   const take = async file => {
     importMsg = null;
+    fileOpen = true;
+    drop.closest('details').open = true;
     fill(msg, el('span', { class: 'dg-dim', text: 'Reading…' }));
     try {
       const saves = await readSaves(file);
-      const go = s => {
-        const { found, unknown } = questsInSave(s.snap, quests);
-        const r = applySave(found, s.info?.characterName ?? null);
-        const at = whereSaved(s.snap);
-        if (at >= 0) setHere(at);
-        importMsg = [el('b', { class: 'dg-good-ink', text: `Loaded ${found.length} quest${found.length === 1 ? '' : 's'} from ${saveLabel(s)}.` }),
-          ` ${r.added} new, ${r.refreshed} updated${r.finished ? `, ${r.finished} finished and removed` : ''}.`,
-          at >= 0 ? ` "I am in" set to ${data.locs.name[at]}.` : '',
-          unknown.length ? el('div', { class: 'dg-dim', text: `Not in the guide's quest list: ${unknown.join(', ')}` }) : ''];
-        importOpen = true;   // stays open so the result shows
-        render();
-      };
+      const go = s => { fileOpen = true; loadSnapshot(s.snap, s.info, 'file'); };
       if (saves.length === 1) return go(saves[0]);
       fill(msg, el('span', { text: `${saves.length} saves in this file. Pick one (newest first):` }));
       fill(choose, ...saves.slice(0, 12).map(s => el('button', { class: 'tool-btn dg-save-pick', onclick: () => go(s) }, saveLabel(s))));
@@ -215,14 +310,17 @@ function importCard(quests) {
   drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dg-drop-on'); });
   drop.addEventListener('dragleave', () => drop.classList.remove('dg-drop-on'));
   drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('dg-drop-on'); if (e.dataTransfer.files[0]) take(e.dataTransfer.files[0]); });
-  return el('details', { class: 'dg-card dg-import', open: importOpen ?? !list.length },
-    el('summary', { class: 'dg-card-name', text: 'Load my quests from the game' }),
-    el('ol', { class: 'dg-howto' },
-      el('li', {}, 'In DFO Online, save your game (Esc → Save Game).'),
-      el('li', {}, 'Open ', el('b', { text: 'Load Game' }), ', find the ', el('b', { text: 'Move saves' }), ' box and press ', el('b', { text: 'Export all saves' }), '. Your browser downloads ', el('b', { text: 'DFO-Online-Saves.zip' }), '.'),
-      el('li', {}, 'Choose that file here. It is read on your device only, nothing is uploaded.'),
-      el('li', { class: 'dg-dim' }, 'Playing an online (realm) character? Copy it to offline first so it shows in the Load list, then export.')),
-    input, drop, choose, msg);
+  return el('div', { class: 'dg-card dg-import' },
+    el('div', { class: 'dg-sync-row' },
+      el('div', {},
+        el('div', { class: 'dg-card-name', text: 'Sync from the game' }),
+        el('div', { class: 'dg-dim', text: 'In DFO Online, click your ⚔ Sync quests bookmark: this page opens with every quest you are on.' })),
+      el('a', { class: 'tool-btn dg-sync-setup', href: 'sync.html' }, list.length ? 'Set up the button' : 'Set it up (once)')),
+    msg,
+    el('details', { class: 'dg-import-file', open: fileOpen },
+      el('summary', { text: 'Or load a saves file' }),
+      el('p', { class: 'dg-dim', text: 'DFO Online: Load Game → Move saves → Export all saves, then choose the zip here. Read on your device only.' }),
+      input, drop, choose));
 }
 
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
@@ -292,7 +390,7 @@ function progress(q, entry, who) {
 // ---- route planner ----
 let returnHome = false;
 function plannerCard(byFile) {
-  const card = el('div', { class: 'dg-card dg-planner' });
+  const card = el('details', { class: 'dg-card dg-planner' });
   // a stop per place (quest places and reward towns kept apart, so a reward waits for its own job only)
   const stops = [];
   for (const entry of list) {
@@ -311,11 +409,11 @@ function plannerCard(byFile) {
       else jobStops.push(k);
     }
   }
-  const head = el('div', { class: 'dg-card-head' },
-    el('span', { class: 'dg-card-name', text: 'Plan my route' }),
+  const head = el('summary', { class: 'dg-card-head dg-planner-head' },
+    el('span', { class: 'dg-card-name', text: 'Best order for all my quests' }),
     el('span', { class: 'dg-tag', text: `${stops.length} place${stops.length === 1 ? '' : 's'} to visit` }));
   if (state.here < 0) return fill(card, head, el('div', { class: 'dg-card-note', text: 'Set "I am in" above to plan a route from where you are.' })), card;
-  if (!stops.length) return fill(card, head, el('div', { class: 'dg-dim', text: 'Nothing to visit: save quests from your journal so their places are known.' })), card;
+  if (!stops.length) return fill(card, head, el('div', { class: 'dg-dim', text: 'Nothing to visit: sync from the game so the quests\' places are known.' })), card;
 
   const result = el('div', { class: 'dg-route' });
   const run = () => {

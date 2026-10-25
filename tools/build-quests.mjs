@@ -153,6 +153,8 @@ function parseQuest(text, file) {
     if ((m = l.match(/^(Item|Person|Place|Clock|Foe)\s+(_\S+_)\b/))) { resources[m[2]] = { kind: m[1], line: l }; continue; }
     if ((m = l.match(/^(_\S+_)\s+task:/))) { task = { name: m[1], lines: [] }; tasks.push(task); continue; }
     if ((m = l.match(/^variable\s+(_\S+_)/))) { task = { name: m[1], lines: [], variable: true }; tasks.push(task); continue; }
+    // `until _x_ performed:` opens a block of its own (DFU persistUntil), not more lines of the task before
+    if ((m = l.match(/^until\s+(_\S+_)\s+performed:?/))) { task = { name: `until ${m[1]}`, lines: [], until: m[1] }; tasks.push(task); continue; }
     task.lines.push(l);
   }
 

@@ -1,5 +1,5 @@
 // Loads the built game data and answers lookups: locations, regions, travel between two places.
-import { calculateTravelTime, calculateTripCost, travelDays, walkTravelPath } from './vendor/travelCore.js?v=9';
+import { calculateTravelTime, calculateTripCost, travelDays, walkTravelPath } from './vendor/travelCore.js?v=10';
 
 export const V = '3';
 const get = (path, kind = 'json') => fetch(`${path}?v=${V}`).then(r => {
@@ -26,6 +26,11 @@ export const loadQuests = () => (questsPromise ||= get('data/quests.json').then(
 // Basic Roads layers (roads, tracks, rivers, streams; 1000x500 bytes each), loaded with the map
 let roadsPromise = null;
 export const loadRoads = () => (roadsPromise ||= get('data/roads.bin', 'bin').then(b => (data.roads = new Uint8Array(b))));
+
+// Book titles and spell names (data/names.json), and where the fixed NPCs stand (data/individuals.json)
+let namesPromise = null, individualsPromise = null;
+export const loadNames = () => (namesPromise ||= get('data/names.json').catch(() => ({ books: {}, spells: {} })));
+export const loadIndividuals = () => (individualsPromise ||= get('data/individuals.json').catch(() => ({})));
 
 export async function loadTowns(region) {
   if (!data.towns[region]) data.towns[region] = await get(`data/towns/r${String(region).padStart(2, '0')}.json`);

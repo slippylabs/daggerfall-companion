@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sync quests // daggerfall.slippylabs.com</title>
+<meta name="description" content="One click in DFO Online sends every quest you are on to the Daggerfall Quest Guide.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cpath%20d%3D%22M32%204%20L40%2028%20L32%2060%20L24%2028Z%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=UnifrakturMaguntia&display=swap">
+<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="daggerfall.css?v=13">
+</head>
+<body>
+<main class="page-wrap">
+  <div class="hud-panel xwide dg-panel">
+    <div class="callsign-row">
+      <span class="callsign">The Iliac Bay · A Traveller's Guide</span>
+      <div class="nav-links"><a href="./#mine" class="logout-link">← My quests</a></div>
+    </div>
+    <h1>Sync quests</h1>
+    <p class="subtitle">One click in DFO Online sends every quest you are on to the guide, with exactly where to go next.</p>
+
+    <div class="dg-card dg-sync-card">
+      <h2 class="dg-card-name">1. Put the button on your bookmarks bar</h2>
+      <p>Drag this button up onto your bookmarks bar (no bar? press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>, or <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> on a Mac):</p>
+      <p class="dg-bm-row"><a id="bookmarklet" class="tool-btn dg-bookmarklet" href="#" title="Drag me to your bookmarks bar">⚔ Sync quests</a></p>
+      <p class="dg-dim" id="bm-note">Dragging does it; clicking it here does nothing.</p>
+
+      <h2 class="dg-card-name">2. Click it while you play</h2>
+      <ol class="dg-howto">
+        <li>Have DFO Online open on <b>daggerfalljs.dev</b>, logged in.</li>
+        <li>Click <b>⚔ Sync quests</b> on your bookmarks bar.</li>
+        <li>The guide opens (or comes to the front) on <b>My quests</b>, with each quest's next step.</li>
+      </ol>
+      <p class="dg-dim">Your online character's save is read from DFO's own account service, on DFO's page: your login never leaves daggerfalljs.dev and nothing is stored on this site's server; the guide keeps your quests in this browser only. DFO saves an online character every few minutes and when you switch tabs, so a sync shows your progress up to then. Playing offline? Save (F9) first.</p>
+      <p class="dg-dim">If your browser blocks the window, allow pop-ups for daggerfalljs.dev.</p>
+    </div>
+    <p><a class="tool-btn" href="./#mine">Back to My quests</a></p>
+  </div>
+</main>
+<script type="module">
+// The bookmark is js/bookmarklet.js itself, as a javascript: link (whole-line comments dropped)
+const src = await (await fetch('js/bookmarklet.js?v=10')).text();
+const code = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+const a = document.getElementById('bookmarklet');
+a.href = 'javascript:' + encodeURIComponent(code);
+a.addEventListener('click', e => { e.preventDefault(); document.getElementById('bm-note').textContent = 'Drag it to your bookmarks bar, then click it on the DFO Online tab.'; });
+</script>
+<div class="sl-legal"><a href="https://slippylabs.com/privacy.html">Privacy</a></div>
+<style>
+.sl-legal{box-sizing:border-box;position:relative;z-index:3;height:64px;display:flex;align-items:center;justify-content:center;margin:0;padding:0 12px;font-family:"Consolas","SFMono-Regular",Menlo,Monaco,"Courier New",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.5}
+.sl-legal a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px}
+.page-wrap{min-height:calc(100vh - 64px)}
+</style>
+</body>
+</html>

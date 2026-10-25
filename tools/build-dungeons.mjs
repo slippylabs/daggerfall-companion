@@ -2,17 +2,23 @@
 //   data/dungeons/rNN.json - every dungeon of a region: {locIdx: [[blockX, blockZ, blockName, isStart], ...]}
 //   data/rdb/<BLOCK>.bin   - one RDB block's floors seen from above: 128x128 Uint16, north row first; bit k set
 //                            where a floor stands in height band k (3.2 units each, block-local y 0..51.2)
+//   data/individuals.json  - fixed NPCs (Individual factions) of castles and dungeons, where they stand, merged
+//                            with build-towns' town ones: {factionId: {name, at: [[locIdx, buildingKey, building]
+//                            | [locIdx, 'd', blockX, blockZ, x, y, z]]}}
 //   data/rdb/index.json    - per block: entrance markers [[x, y, z]] (editor flats 199/10) and quest spawn/item
 //                            markers (199/11, 199/18, used only by verify.mjs) in block-local units
 // A block is 2048 classic units = 51.2 units square; dungeon block (x, z) sits at (x, z) * 51.2, north = +z.
 import { dfo, arena2, loadMaps, writeOut } from './lib/env.mjs';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { SITE } from './lib/env.mjs';
+import { SITE, ROOT } from './lib/env.mjs';
 
 const { BlocksFile, RDB_RESOURCE_TYPES } = await dfo('src/formats/blocksFile.js');
 const { Arch3dFile } = await dfo('src/formats/arch3dFile.js');
 const { getModelMatrix, rdbObjects } = await dfo('src/world/rdbLayout.js');
+const { FactionFile, FACTION_TYPES } = await dfo('src/formats/factionFile.js');
+const factions = new FactionFile();
+factions.load(arena2('FACTION.TXT'));
 
 const GS = 1 / 40, SIDE = 51.2, N = 128, BAND = 3.2;
 const maps = await loadMaps();
@@ -67,19 +73,21 @@ function fillTriangle(grid, a, b, c, bit) {
   }
 }
 const index = {};
+const peopleIn = new Map();
 let floorPixels = 0;
 for (const name of [...used].sort()) {
   const blk = blocks.getBlockByName(name);
   const rdb = blk?.rdbBlock;
   if (!rdb) throw new Error(`block ${name} missing`);
   const grid = new Uint16Array(N * N);
-  const start = [], quest = [];
+  const start = [], quest = [], people = [];
   for (const obj of rdbObjects(rdb)) {
     if (obj.type === RDB_RESOURCE_TYPES.Flat) {
       const fr = obj.resources.flatResource;
       const at = () => [obj.xPos * GS, -obj.yPos * GS, obj.zPos * GS].map(v => Math.round(v * 10) / 10);
       if (fr?.textureArchive === 199 && fr.textureRecord === 10) start.push(at());
       if (fr?.textureArchive === 199 && (fr.textureRecord === 11 || fr.textureRecord === 18)) quest.push(at());
+      if (fr && factions.getFaction(fr.factionOrMobileId)?.type === FACTION_TYPES.Individual) people.push([fr.factionOrMobileId, ...at()]);
       continue;
     }
     if (obj.type !== RDB_RESOURCE_TYPES.Model) continue;
@@ -109,6 +117,21 @@ for (const name of [...used].sort()) {
   for (const v of grid) if (v) floorPixels++;
   writeOut(`data/rdb/${name.replace('.RDB', '')}.bin`, new Uint8Array(grid.buffer));
   index[name.replace('.RDB', '')] = { start, quest };
+  if (people.length) peopleIn.set(name.replace('.RDB', ''), people);
 }
 writeOut('data/rdb/index.json', JSON.stringify(index));
-console.log(`${dungeons} dungeons, ${used.size} blocks, ${floorPixels} floor pixels`);
+
+// 3. fixed NPCs: town buildings (build-towns) + castle and dungeon spots (every dungeon using the block)
+// a person found in more than one town is a stray id in a shared template, not a real placement
+const individuals = Object.fromEntries(Object.entries(JSON.parse(readFileSync(join(ROOT, 'tools/.cache/individuals-towns.json'), 'utf8')))
+  .filter(([, v]) => new Set(v.at.map(a => a[0])).size === 1));
+for (let r = 0; r < maps.regionCount; r++) {
+  let file;
+  try { file = JSON.parse(readFileSync(join(SITE, `data/dungeons/r${String(r).padStart(2, '0')}.json`), 'utf8')); } catch { continue; }
+  for (const [loc, list] of Object.entries(file))
+    for (const [bx, bz, name] of list)
+      for (const [id, x, y, z] of peopleIn.get(name) || [])
+        (individuals[id] ||= { name: factions.getFaction(id)?.name ?? '', at: [] }).at.push([+loc, 'd', bx, bz, x, y, z]);
+}
+writeOut('data/individuals.json', JSON.stringify(individuals));
+console.log(`${dungeons} dungeons, ${used.size} blocks, ${floorPixels} floor pixels; ${Object.keys(individuals).length} fixed NPCs placed`);

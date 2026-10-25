@@ -3,7 +3,8 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=9';
+import { data } from './data.js?v=10';
+import { questNow } from './questNow.js?v=10';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -76,8 +77,74 @@ export function whereSaved(snap) {
   return best;
 }
 
+// The player's quest items, from every inventory the save holds (DFO save.js: items, wagon, bag, repair)
+function questItems(snap) {
+  return ['items', 'wagonItems', 'bagItems', 'otherItems'].flatMap(k => snap[k] || [])
+    .filter(it => it?.questItem).map(it => ({ questUID: it.questUID, symbol: it.questSymbol?.original || it.questSymbol?.name }));
+}
+
+// An item as the player sees it: an artifact's name, gold as an amount, a book by its title, else the template
+function itemName(r, names) {
+  const it = r?.resourceSpecific?.item;
+  if (!it) return null;
+  if (it.shortName) return it.shortName;
+  if (/gold/i.test(it.name || '') && it.stackCount) return `${it.stackCount} gold`;
+  const title = it.message != null && /book|parchment/i.test(it.name || '') ? names?.books?.[it.message & 0xff] : null;
+  return title ? `the book "${title}"` : (it.name ? it.name.toLowerCase() : null);
+}
+
+// Every open objective of a save's quest, resolved to an exact target: who/what, the town (location index),
+// the building (key + name) or the spot inside a dungeon, from the save's own Places, Persons and markers
+export function guideFor(sq, snap, extra = {}) {
+  const byMapId = guideFor.byMapId ||= (() => { const m = new Map(); data.locs.mapId.forEach((id, i) => { if (!m.has(id)) m.set(id, i); }); return m; })();
+  const res = new Map((sq.resources || []).map(r => [r.symbol?.original, r]));
+  const site = s => res.get(s)?.resourceSpecific?.siteDetails || null;
+  const { objectives } = questNow(sq, questItems(snap));
+  const markerFor = (sd, target) => {
+    for (const m of [sd?.selectedMarker, ...(sd?.questSpawnMarkers || []), ...(sd?.questItemMarkers || [])])
+      if (m?.flatPosition && (m.targetResources || []).some(t => (t?.original ?? `_${t?.name}_`) === target))
+        return { bx: m.dungeonX, bz: m.dungeonZ, ...m.flatPosition };
+    return null;
+  };
+  const at = (placeSym, target) => {
+    const sd = site(placeSym);
+    if (!sd) return {};
+    const loc = byMapId.get(sd.mapId);
+    const key = sd.buildingKey || sd.unseated?.buildingKey;
+    return { loc, building: key > 0 && sd.buildingName ? { key, name: sd.buildingName } : null,
+      spot: target ? markerFor(sd, target) : null, dungeon: !key && sd.siteType === 2 };
+  };
+  const person = (s, placeSym) => {
+    const r = res.get(s), p = r?.resourceSpecific || {};
+    const where = at(placeSym || p.lastAssignedPlaceSymbol?.original || p.homePlaceSymbol?.original, s);
+    if (where.loc === undefined && p.isIndividualNPC) {
+      const fixed = extra.individuals?.[p.factionID]?.at?.[0];
+      if (fixed?.[1] === 'd') Object.assign(where, { loc: fixed[0], dungeon: true, spot: { bx: fixed[2], bz: fixed[3], x: fixed[4], y: fixed[5], z: fixed[6] } });
+      else if (fixed) Object.assign(where, { loc: fixed[0], building: { key: fixed[1], name: fixed[2] } });
+    }
+    return { who: p.displayName || null, ...where };
+  };
+  return objectives.map(o => {
+    const base = { kind: o.kind, later: !!o.later, payer: !!o.payer, answer: o.answer || null, injure: !!o.injure, count: o.count || 1, automatic: !!o.automatic };
+    const item = o.item ? itemName(res.get(o.item), extra.names) : null;
+    switch (o.kind) {
+      case 'talk': case 'reward': return { ...base, ...(o.npc ? person(o.npc, o.place) : {}) };
+      case 'bring': return { ...base, item, ...person(o.npc, o.place) };
+      case 'kill': {
+        const f = res.get(o.foe)?.resourceSpecific || {};
+        return { ...base, who: f.typeName || f.displayName || null, ...at(o.place, o.foe) };
+      }
+      case 'pickup': case 'drop': return { ...base, item, ...at(o.place, o.item) };
+      case 'use': return { ...base, item };
+      case 'cast': return { ...base, spell: extra.names?.spells?.[o.spell] || `spell ${o.spell}` };
+      case 'go': return { ...base, ...at(o.place) };
+      default: return base;
+    }
+  });
+}
+
 // The active quests of a save, each as {q, names, days, daysLeft, locs} in the shape the journal reader gives
-export function questsInSave(snap, quests) {
+export function questsInSave(snap, quests, extra = {}) {
   const byFile = new Map(quests.map(q => [q.file.toUpperCase(), q]));
   const byMapId = new Map();
   data.locs.mapId.forEach((id, i) => { if (!byMapId.has(id)) byMapId.set(id, i); });
@@ -136,7 +203,9 @@ export function questsInSave(snap, quests) {
     }
     // days left: the quest's own timer, else the tightest running clock
     const daysLeft = clocks[q.timer] ?? (Object.keys(clocks).length ? Math.min(...Object.values(clocks)) : null);
-    out.push({ q, names, days, daysLeft, locs, buildings, spots, uid: sq.uid });
+    let guide = null;
+    try { guide = guideFor(sq, snap, extra); } catch (e) { console.warn('guide', sq.questName, e); }
+    out.push({ q, names, days, daysLeft, locs, buildings, spots, guide, uid: sq.uid });
   }
   return { found: out, unknown };
 }

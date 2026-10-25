@@ -5,7 +5,8 @@ globalThis.location = { search: '?online=1' };
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { dfo, arena2, loadMaps, writeOut, SITE } from './lib/env.mjs';
+import { dfo, arena2, loadMaps, writeOut, SITE, ROOT } from './lib/env.mjs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 
 const { BlocksFile } = await dfo('src/formats/blocksFile.js');
 const { layoutLocation } = await dfo('src/world/locationLayout.js');
@@ -45,6 +46,9 @@ for (let i = 0; i < locs.name.length; i++) indexOf.set(`${locs.region[i]}:${locs
 
 const typeNames = Object.fromEntries(Object.entries(BUILDING_TYPES).map(([k, v]) => [v, k]));
 let towns = 0, buildings = 0, biggest = 0;
+// Fixed NPCs (factions of type Individual: Lord Kain, guild masters...) stand in a building's interior as a
+// people record carrying their faction id; a quest naming one has no Place for them in the save
+const individuals = {};
 for (let r = 0; r < maps.regionCount; r++) {
   const region = maps.getRegion(r);
   if (!region) continue;
@@ -55,6 +59,19 @@ for (let r = 0; r < maps.regionCount; r++) {
     const layout = layoutLocation(loc, maps, blocks, { enhanced: false, windmills: false });
     const opts = nameOpts(r, loc);
     const list = buildingSummaries(loc.exterior.buildings, layout.blocks, opts);
+    const keyOf = new Map(list.map(b => [`${b.blockX},${b.blockY},${b.recordIndex}`, b]));
+    for (const blk of layout.blocks) {
+      (blk.dfBlock?.rmbBlock?.subRecords ?? []).forEach((sub, i) => {
+        for (const p of sub?.interior?.blockPeopleRecords ?? []) {
+          const fac = factions.getFaction(p.factionID);
+          // shared shop and house templates carry stray individual ids; a person is real in their own region
+          if (fac?.type !== FACTION_TYPES.Individual || fac.region !== r) continue;
+          const b = keyOf.get(`${blk.x ?? 0},${blk.y ?? 0},${i}`);
+          if (!b) continue;
+          (individuals[p.factionID] ||= []).push([indexOf.get(`${r}:${loc.name}`), b.buildingKey, b.name || '']);
+        }
+      });
+    }
     // Houses have no name until a quest names one, so they are kept as positions + building key (the key a
     // quest site in a save names: DFO place.js makeBuildingKey(blockX, blockY, record))
     const houses = [];
@@ -81,4 +98,9 @@ for (let r = 0; r < maps.regionCount; r++) {
   biggest = Math.max(biggest, json.length);
   writeOut(`data/towns/r${String(r).padStart(2, '0')}.json`, json);
 }
+// an intermediate for build-dungeons, which merges in the castles' people and publishes data/individuals.json
+mkdirSync(join(ROOT, 'tools/.cache'), { recursive: true });
+writeFileSync(join(ROOT, 'tools/.cache/individuals-towns.json'), JSON.stringify(Object.fromEntries(Object.entries(individuals)
+  .map(([id, list]) => [id, { name: factions.getFaction(+id)?.name ?? '', at: list }]))));
+console.log(`${Object.keys(individuals).length} fixed NPCs placed in buildings`);
 console.log(`${towns} locations with buildings, ${buildings} buildings, largest region file ${(biggest / 1024).toFixed(0)} KB`);

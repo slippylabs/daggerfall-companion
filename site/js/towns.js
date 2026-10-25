@@ -1,8 +1,8 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=9';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=9';
-import { state } from './state.js?v=9';
-import { showDungeon, dungeonBlocks } from './dungeon.js?v=9';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=10';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=10';
+import { state } from './state.js?v=10';
+import { showDungeon, dungeonBlocks } from './dungeon.js?v=10';
 
 const $ = id => document.getElementById(id);
 const canvas = $('town-canvas'), ctx = canvas.getContext('2d');
@@ -38,7 +38,7 @@ export function townsShown() {
 
 let loading = null;
 // A building by its key (the key a quest site in a save names): {bx, by, x, z} or null
-function byKey(town, key) {
+export function buildingAt(town, key) {
   const b = town.b.find(r => r[8] === key);
   if (b) return { bx: b[4], by: b[5], x: b[6], z: b[7] };
   for (let k = 0; k < town.houses.length; k += HOUSE)
@@ -48,7 +48,7 @@ function byKey(town, key) {
 
 // Where a building stands in its town, in words: "in the north-east part of town, about 180 m from the middle"
 const PARTS = ['east', 'north-east', 'north', 'north-west', 'west', 'south-west', 'south', 'south-east'];
-function whereInTown(town, p) {
+export function whereInTown(town, p) {
   const dx = p.bx * BLOCK + p.x - town.w * BLOCK / 2, dy = p.by * BLOCK + p.z - town.h * BLOCK / 2;
   const m = Math.hypot(dx, dy);
   if (m < 40) return 'right in the middle of town';
@@ -65,7 +65,7 @@ export async function openTown(i, buildingName = null, opts = {}) {
   if (loading !== i) return;   // a later pick won
   loading = null;
   current = { i, file, town: file.towns[i] || null };
-  const at = opts.key && current.town ? byKey(current.town, opts.key) : null;
+  const at = opts.key && current.town ? buildingAt(current.town, opts.key) : null;
   mark = at ? { ...at, name: buildingName } : null;
   highlight = mark ? null : buildingName;
   $('town-input').value = data.locs.name[i];
