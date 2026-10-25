@@ -1,12 +1,12 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=5';
-import { el, fill } from './ui.js?v=5';
-import { state, onChange, showOnMap } from './state.js?v=5';
-import { rewardGivers, nameFor } from './questText.js?v=5';
-import { showQuest } from './quests.js?v=5';
-import { planRoute } from './route.js?v=5';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=6';
+import { el, fill } from './ui.js?v=6';
+import { state, onChange, showOnMap } from './state.js?v=6';
+import { rewardGivers, nameFor, stepText } from './questText.js?v=6';
+import { showQuest } from './quests.js?v=6';
+import { planRoute } from './route.js?v=6';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -32,35 +32,76 @@ function updateCount() {
   if (btn) btn.textContent = list.length ? `My quests (${list.length})` : 'My quests';
 }
 
-// Add a quest (names/days from a recognised journal entry, or none when tracked from the Quests tab)
-export function trackQuest(q, names = {}, days = {}) {
-  const key = q.file + '|' + JSON.stringify(names);
-  if (list.some(e => e.key === key)) return false;
-  // the journal's days, else a fixed timer from the script ("1 day"); travel-based timers stay unknown
-  const fixed = q.timer && q.resources[q.timer]?.role.match(/^(\d+) days?/);
-  const timer = q.timer && days[q.timer] ? +days[q.timer] : fixed ? +fixed[1] : null;
-  list.unshift({ key, file: q.file, names, days, daysLeft: timer, saved: Date.now() });
-  save();
+// Two readings of the same quest agree when no blank was read as two different names
+const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+function compatible(a, b) {
+  for (const sym of Object.keys(a)) {
+    if (!b[sym]) continue;
+    for (const n of Object.keys(a[sym])) if (b[sym][n] && !sameName(a[sym][n], b[sym][n])) return false;
+  }
   return true;
 }
+const covers = (have, names) => Object.entries(names).every(([sym, ns]) =>
+  Object.entries(ns).every(([n, v]) => have[sym]?.[n] && sameName(have[sym][n], v)));
+const findEntry = (q, names) => list.find(e => e.file === q.file && compatible(e.names, names));
 
-export const isTracked = (q, names = {}) => list.some(e => e.key === q.file + '|' + JSON.stringify(names));
+// 'saved' when the quest is saved with every one of these names, 'update' when a newer journal entry
+// adds names to a saved quest, else 'new'
+export function trackState(q, names = {}) {
+  const e = findEntry(q, names);
+  return !e ? 'new' : covers(e.names, names) ? 'saved' : 'update';
+}
+export const isTracked = (q, names = {}) => trackState(q, names) === 'saved';
 
-// The places of a saved quest the player can travel to: [{label, loc}]
+// the journal's days, else a fixed timer from the script ("1 day"); travel-based timers stay unknown
+function timerDays(q, days) {
+  const fixed = q.timer && q.resources[q.timer]?.role.match(/^(\d+) days?/);
+  return q.timer && days[q.timer] ? +days[q.timer] : fixed ? +fixed[1] : null;
+}
+
+// Add a quest (names/days from a recognised journal entry, or none when tracked from the Quests tab).
+// A later journal entry of a quest already saved fills in its new names instead of saving it twice.
+export function trackQuest(q, names = {}, days = {}) {
+  const e = findEntry(q, names);
+  if (e) {
+    if (covers(e.names, names) && !Object.keys(days).some(k => days[k] !== e.days[k])) return false;
+    for (const [sym, ns] of Object.entries(names)) e.names[sym] = { ...e.names[sym], ...ns };
+    const fresh = Object.keys(days).some(k => days[k] !== e.days[k]);
+    Object.assign(e.days, days);
+    if (fresh && timerDays(q, days) != null) e.daysLeft = timerDays(q, days);
+    e.key = q.file + '|' + JSON.stringify(e.names);
+    save();
+    return 'updated';
+  }
+  list.unshift({ key: q.file + '|' + JSON.stringify(names), file: q.file, names, days, daysLeft: timerDays(q, days), done: [], jobDone: false, saved: Date.now() });
+  save();
+  return 'saved';
+}
+
+// Steps the player does (the rest are facts: "X is at Y")
+const ACT = new Set(['kill', 'pickup', 'bring', 'talk', 'go']);
+const actions = q => q.steps.map((st, i) => [st, i]).filter(([st]) => ACT.has(st.k));
+
+// The places of a saved quest the player can travel to: [{label, loc, claim}]. Once the job is done
+// only the reward is left; until then the reward is claimed after the quest's places.
 export function destinations(q, entry) {
   const out = [];
   const here = state.here;
-  const add = (label, name) => {
+  const add = (label, name, claim) => {
     const loc = locationsNamed(name, here, state.opts)[0];
-    if (loc !== undefined && !out.some(d => d.loc === loc)) out.push({ label, loc });
+    if (loc !== undefined && !out.some(d => d.loc === loc && d.claim === claim)) out.push({ label, loc, claim });
   };
-  for (const [sym, r] of Object.entries(q.resources)) {
-    const n = entry.names[sym];
-    if (!n) continue;
-    if (r.kind === 'Place') add('Quest place', n[3] || n[2] || n[1]);
+  if (!entry.jobDone) {
+    for (const [sym, r] of Object.entries(q.resources)) {
+      const n = entry.names[sym];
+      if (!n) continue;
+      if (r.kind === 'Place') add('Quest place', n[3] || n[2] || n[1], false);
+    }
   }
-  for (const g of rewardGivers(q, entry.names)) {
-    if (g.town) add(`Claim reward (${g.name || (g.questor ? 'the quest giver' : g.role)})`, g.town);
+  if (!q.reward.automatic) {
+    for (const g of rewardGivers(q, entry.names)) {
+      if (g.town) add(`Claim reward (${g.name || (g.questor ? 'the quest giver' : g.role)})`, g.town, true);
+    }
   }
   return out;
 }
@@ -90,11 +131,12 @@ async function render() {
       placeholder: '–', 'aria-label': 'Game days left',
       onchange: e => { entry.daysLeft = e.target.value === '' ? null : +e.target.value; save(); render(); },
     });
-    return el('div', { class: 'dg-card dg-mine' },
+    return el('div', { class: 'dg-card dg-mine' + (entry.jobDone ? ' dg-mine-done' : '') },
       el('div', { class: 'dg-card-head' },
         el('span', { class: 'dg-card-name', text: q.title || q.file }),
         el('span', { class: 'dg-tag', text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'} left` : 'no time limit noted' })),
       el('div', { class: 'dg-card-meta' }, el('b', { text: 'Claim reward from: ' }), who),
+      progress(q, entry, who),
       el('ul', { class: 'dg-trips' }, dests.map(d => {
         const trip = state.here >= 0 && d.loc !== state.here ? travelBetween(state.here, d.loc, state.opts) : null;
         const late = trip && entry.daysLeft != null && trip.minutes > entry.daysLeft * 1440;
@@ -113,22 +155,52 @@ async function render() {
   }));
 }
 
+// ---- progress: tick the steps off; the next one is spelled out ----
+function progress(q, entry, who) {
+  entry.done ||= [];
+  const acts = actions(q);
+  const set = (fn) => { fn(); save(); render(); };
+  const next = entry.jobDone
+    ? (q.reward.automatic ? 'Job done: the reward was given. Press "Done — remove".' : `Go and claim your reward from ${who}.`)
+    : acts.find(([, i]) => !entry.done.includes(i))?.[0];
+  const box = (checked, label, onchange) => el('label', { class: 'tool-check dg-ink dg-step' + (checked ? ' dg-step-done' : '') },
+    el('input', { type: 'checkbox', checked, onchange }), ' ', label);
+  return el('div', { class: 'dg-progress' },
+    el('div', { class: 'dg-next' }, el('b', { text: 'Next: ' }),
+      typeof next === 'string' ? next : next ? stepText(q, next, entry.names) : 'Do the job, then tick "Job done".'),
+    el('details', { class: 'dg-checklist', open: !entry.jobDone && acts.length > 0 },
+      el('summary', { text: `Steps (${acts.filter(([, i]) => entry.done.includes(i)).length + (entry.jobDone ? 1 : 0)}/${acts.length + 1} done)` }),
+      ...acts.map(([st, i]) => box(entry.done.includes(i), stepText(q, st, entry.names), e => set(() => {
+        entry.done = e.target.checked ? [...entry.done, i] : entry.done.filter(x => x !== i);
+        // the last step ticked finishes the job; unticking one reopens it
+        entry.jobDone = acts.every(([, j]) => entry.done.includes(j));
+      }))),
+      box(entry.jobDone, q.reward.automatic ? 'Job done' : 'Job done — only the reward is left', e => set(() => {
+        entry.jobDone = e.target.checked;
+        entry.done = entry.jobDone ? acts.map(([, i]) => i) : [];
+      }))));
+}
+
 // ---- route planner ----
 let returnHome = false;
 function plannerCard(byFile) {
   const card = el('div', { class: 'dg-card dg-planner' });
+  // a stop per place (quest places and reward towns kept apart, so a reward waits for its own job only)
   const stops = [];
   for (const entry of list) {
     const q = byFile.get(entry.file);
     if (!q) continue;
-    for (const d of destinations(q, entry)) {
-      if (d.loc === state.here) continue;
-      const deadlineMin = entry.daysLeft != null ? entry.daysLeft * 1440 : null;
-      const same = stops.find(s => s.loc === d.loc);
-      if (same) {
-        same.why.push(`${q.title || q.file}: ${d.label}`);
-        if (deadlineMin != null) same.deadlineMin = Math.min(same.deadlineMin ?? Infinity, deadlineMin);
-      } else stops.push({ loc: d.loc, deadlineMin, why: [`${q.title || q.file}: ${d.label}`] });
+    const dests = destinations(q, entry).filter(d => d.loc !== state.here);
+    const deadlineMin = entry.daysLeft != null ? entry.daysLeft * 1440 : null;
+    const jobStops = [];
+    for (const d of dests.sort((a, b) => a.claim - b.claim)) {
+      let k = stops.findIndex(s => s.loc === d.loc && s.claim === d.claim);
+      if (k < 0) { k = stops.push({ loc: d.loc, claim: d.claim, deadlineMin: null, after: [], why: [] }) - 1; }
+      const st = stops[k];
+      st.why.push(`${q.title || q.file}: ${d.label}`);
+      if (deadlineMin != null) st.deadlineMin = Math.min(st.deadlineMin ?? Infinity, deadlineMin);
+      if (d.claim) st.after.push(...jobStops.filter(j => !st.after.includes(j)));
+      else jobStops.push(k);
     }
   }
   const head = el('div', { class: 'dg-card-head' },
@@ -159,7 +231,7 @@ function plannerCard(byFile) {
   };
   const home = el('label', { class: 'tool-check dg-ink' },
     el('input', { type: 'checkbox', checked: returnHome, onchange: e => { returnHome = e.target.checked; run(); } }), ` Come back to ${data.locs.name[state.here]} at the end`);
-  fill(card, head, el('div', { class: 'dg-card-meta', text: `The fastest order from ${data.locs.name[state.here]} with your travel settings, checked against each quest's days left.` }), home, result);
+  fill(card, head, el('div', { class: 'dg-card-meta', text: `The fastest order from ${data.locs.name[state.here]} with your travel settings, checked against each quest's days left. Rewards come after their quest's job; tick "Job done" and the job's place drops off.` }), home, result);
   run();
   return card;
 }

@@ -1,13 +1,13 @@
 // Journal tab: paste quest text, find every town/dungeon and building it names.
-import { data, normalise, regionName, loadTowns, travelBetween } from './data.js?v=5';
-import { el, fill, locationCard } from './ui.js?v=5';
-import { state, showOnMap } from './state.js?v=5';
-import { openTown } from './towns.js?v=5';
-import { recognise } from './recognise.js?v=5';
-import { showQuest } from './quests.js?v=5';
-import { trackQuest, isTracked } from './myquests.js?v=5';
-import { stepText, rewardGivers, nameFor } from './questText.js?v=5';
-import { formatDuration } from './data.js?v=5';
+import { data, normalise, regionName, loadTowns, travelBetween } from './data.js?v=6';
+import { el, fill, locationCard } from './ui.js?v=6';
+import { state, showOnMap } from './state.js?v=6';
+import { openTown } from './towns.js?v=6';
+import { recognise } from './recognise.js?v=6';
+import { showQuest } from './quests.js?v=6';
+import { trackQuest, trackState } from './myquests.js?v=6';
+import { stepText, rewardGivers, nameFor } from './questText.js?v=6';
+import { formatDuration } from './data.js?v=6';
 
 const $ = id => document.getElementById(id);
 let nameIndex = null, regionIndex = null;
@@ -185,6 +185,16 @@ function locationFor(q, sym, names) {
   return -1;
 }
 
+// Save, or for a quest already saved from an earlier entry, add this entry's new names to it
+function saveButton(q, names, days) {
+  const st = trackState(q, names);
+  const label = { new: 'Save to My quests', update: 'Update my saved quest', saved: 'Saved ✓' }[st];
+  return el('button', {
+    class: 'tool-btn dg-save', disabled: st === 'saved',
+    onclick: e => { const r = trackQuest(q, names, days); e.target.textContent = r === 'updated' ? 'Updated ✓' : 'Saved ✓'; e.target.disabled = true; },
+  }, label);
+}
+
 function questCard(m) {
   const { quest: q, names, days, partial } = m;
   const givers = rewardGivers(q, names);
@@ -215,11 +225,7 @@ function questCard(m) {
       el('span', { class: 'dg-card-name', text: q.title || q.file }),
       el('span', { class: 'dg-card-actions' },
         el('button', { class: 'tool-btn', onclick: () => showQuest(q, names, days) }, 'Full walkthrough'),
-        partial ? null : el('button', {
-          class: 'tool-btn dg-save',
-          onclick: e => { trackQuest(q, names, days); e.target.textContent = 'Saved ✓'; e.target.disabled = true; },
-          disabled: isTracked(q, names),
-        }, isTracked(q, names) ? 'Saved ✓' : 'Save to My quests'))),
+        partial ? null : saveButton(q, names, days))),
     partial ? el('div', { class: 'dg-card-note', text: 'The wording is close but not exact, so names could not be read. Paste the whole entry to fill them in.' }) : null,
     m.others.length ? el('div', { class: 'dg-dim', text: `Same wording also used by: ${m.others.map(o => o.title || o.file).join(', ')}` }) : null,
 

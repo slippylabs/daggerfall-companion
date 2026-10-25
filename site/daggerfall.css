@@ -229,3 +229,12 @@ code { color: var(--gold); }
 .dg-route .dg-steps li { margin-bottom: 4px; }
 .dg-route-total { margin: 8px 0 10px; color: var(--ink); }
 .dg-ink { color: var(--ink) !important; }
+/* My quests: progress */
+.dg-progress { margin-top: 8px; color: var(--ink); }
+.dg-next { padding: 8px 10px; background: rgba(140, 28, 19, 0.08); border-left: 4px solid var(--ink-red); }
+.dg-checklist { margin-top: 6px; }
+.dg-checklist summary { font-family: var(--caps); font-size: 0.8rem; color: var(--ink-soft); cursor: pointer; min-height: 40px; display: flex; align-items: center; }
+.dg-step { display: flex; align-items: center; gap: 8px; min-height: 40px; line-height: 1.35; }
+.dg-step input { width: 20px; height: 20px; flex: none; accent-color: var(--ink-red); }
+.dg-step-done { text-decoration: line-through; opacity: 0.65; }
+.dg-mine-done .dg-card-name::after { content: " — reward left"; font-size: 0.8em; color: var(--ink-red); }

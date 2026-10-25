@@ -37,10 +37,16 @@ for (let t = 0; t < 200; t++) {
   const k = 2 + rnd(6);
   const stops = [];
   while (stops.length < k) { const l = pool[rnd(pool.length)]; if (l !== start && !stops.includes(l)) stops.push(l); }
+  // every other trip: some stops must wait for others (a quest's reward after its job)
+  const after = stops.map((_, i) => (t % 2 && i > 0 && rnd(2) ? [rnd(i)] : []));
   for (const returnHome of [false, true]) {
-    const plan = planRoute(start, stops.map(loc => ({ loc })), opts, { returnHome });
+    const plan = planRoute(start, stops.map((loc, i) => ({ loc, after: after[i] })), opts, { returnHome });
+    const pos = plan.order.map((_, n) => n);
+    plan.order.forEach((s, n) => (pos[s] = n));
+    if (after.some((a, i) => a.some(j => pos[j] > pos[i]))) { bad++; console.log(`  case ${t}: planner broke an order rule`); }
     let best = Infinity;
     for (const p of perms([...stops.keys()])) {
+      if (after.some((a, i) => a.some(j => p.indexOf(j) > p.indexOf(i)))) continue;
       let at = start, total = 0;
       for (const i of p) { total += travelBetween(at, stops[i], opts).minutes; at = stops[i]; }
       if (returnHome) total += travelBetween(at, start, opts).minutes;
@@ -50,5 +56,5 @@ for (let t = 0; t < 200; t++) {
     if (plan.total !== best) { bad++; console.log(`  case ${t}: planner ${plan.total} vs best ${best}`); }
   }
 }
-console.log(`route planner optimal on ${cases - bad}/${cases} random trips (2-7 stops, one-way and round trip)`);
+console.log(`route planner optimal on ${cases - bad}/${cases} random trips (2-7 stops, one-way and round trip, half with reward-after-job rules)`);
 process.exit(bad ? 1 : 0);
