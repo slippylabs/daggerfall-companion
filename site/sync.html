@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=UnifrakturMaguntia&display=swap">
 <link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="daggerfall.css?v=16">
+<link rel="stylesheet" href="daggerfall.css?v=17">
 </head>
 <body>
 <main class="page-wrap">
@@ -43,7 +43,7 @@
 </main>
 <script type="module">
 // The bookmark is js/bookmarklet.js itself, as a javascript: link (whole-line comments dropped)
-const src = await (await fetch('js/bookmarklet.js?v=13')).text();
+const src = await (await fetch('js/bookmarklet.js?v=14')).text();
 const code = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
 const a = document.getElementById('bookmarklet');
 a.href = 'javascript:' + encodeURIComponent(code);

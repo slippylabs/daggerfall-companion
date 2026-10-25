@@ -73,6 +73,8 @@ const store = new Map([
 ]);
 // the newest save's snapshot also stands alone, for the sync tests (a realm save is this same JSON)
 writeFileSync(join(ROOT, 'tools/fixtures/realm-save.json'), store.get('dagger.save.1'));
+// ...and a later online checkpoint, the delivery done (it has left the quest list), for the live-sync test
+writeFileSync(join(ROOT, 'tools/fixtures/realm-save-later.json'), snap([hunt(true)], { x: PENBRUGH.px, y: PENBRUGH.py }, T1 + 600));
 const keys = [...store.keys()];
 const storage = { get length() { return keys.length; }, key: i => keys[i], getItem: k => store.get(k) ?? null };
 const zip = exportSavesZip(storage);

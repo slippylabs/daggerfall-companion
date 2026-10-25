@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=13';
-import { el, fill } from './ui.js?v=13';
-import { state, onChange, showOnMap, setHere } from './state.js?v=13';
-import { rewardGivers, nameFor, stepText } from './questText.js?v=13';
-import { showQuest } from './quests.js?v=13';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=13';
-import { planRoute } from './route.js?v=13';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=13';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=14';
+import { el, fill } from './ui.js?v=14';
+import { state, onChange, showOnMap, setHere } from './state.js?v=14';
+import { rewardGivers, nameFor, stepText } from './questText.js?v=14';
+import { showQuest } from './quests.js?v=14';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=14';
+import { planRoute } from './route.js?v=14';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=14';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -92,7 +92,7 @@ export function applySave(found, character) {
     let e = list.find(x => x.file === f.q.file && x.uid != null && x.uid === f.uid && x.character === character)
       || list.find(x => x.file === f.q.file && x.uid == null && compatible(x.names, f.names));
     if (e) refreshed++;
-    else { e = { file: f.q.file, done: [], jobDone: false, saved: Date.now() }; list.unshift(e); added++; }
+    else { e = { file: f.q.file, done: [], jobDone: false, saved: Date.now(), fresh: Date.now() }; list.unshift(e); added++; }
     Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, spots: f.spots, guide: f.guide, uid: f.uid, character, synced: Date.now() });
     e.key = f.q.file + '|' + JSON.stringify(f.names);
     seen.add(e);
@@ -230,7 +230,9 @@ function nowCard(q, entry) {
   const body = !g.length
     ? el('div', { class: 'dg-step-block dg-step-now' }, el('div', { class: 'dg-step-what', text: 'Nothing the guide can point to. Check the quest in your journal, or open details.' }))
     : [nowBlock(g[0], q), g[1] ? thenLine(g[1], q) : null];
-  return el('div', { class: 'dg-card dg-mine dg-mine-now' }, head, body,
+  // a quest that just arrived from the game glows for a couple of minutes
+  const fresh = entry.fresh && Date.now() - entry.fresh < 120000 && list.length > 1;
+  return el('div', { class: 'dg-card dg-mine dg-mine-now' + (fresh ? ' dg-fresh' : '') }, head, body,
     el('details', { class: 'dg-more' }, el('summary', { text: 'details' }), ...legacyParts(q, entry)));
 }
 
@@ -283,15 +285,17 @@ export async function loadSnapshot(snap, info, via) {
   const r = applySave(found, info?.characterName ?? null);
   const at = whereSaved(snap);
   if (at >= 0) setHere(at);
-  importMsg = [el('b', { class: 'dg-good-ink', text: `${via === 'sync' ? 'Synced' : 'Loaded'} ${found.length} quest${found.length === 1 ? '' : 's'}${info ? ` from ${saveLabel({ info, n: 0 })}` : ''}.` }),
+  if (via === 'live' || via === 'sync') liveAt = Date.now();
+  importMsg = via === 'live' ? null : [el('b', { class: 'dg-good-ink', text: `${via === 'sync' ? 'Synced' : 'Loaded'} ${found.length} quest${found.length === 1 ? '' : 's'}${info ? ` from ${saveLabel({ info, n: 0 })}` : ''}.` }),
     ` ${r.added} new, ${r.refreshed} updated${r.finished ? `, ${r.finished} finished and removed` : ''}.`,
     at >= 0 ? ` "I am in" set to ${data.locs.name[at]}.` : '',
     unknown.length ? el('div', { class: 'dg-dim', text: `Not in the guide's quest list: ${unknown.join(', ')}` }) : ''];
-  if (state.tab !== 'mine') tabs?.show('mine');
+  if (state.tab !== 'mine' && via !== 'live') tabs?.show('mine');
   await render();
   return found.length;
 }
 // ---- the top card: Sync from the game (one click), or a saves file ----
+let liveAt = 0;
 let fileOpen = false;
 function syncCard(quests) {
   const msg = el('div', { class: 'dg-import-msg', 'aria-live': 'polite' });
@@ -322,7 +326,9 @@ function syncCard(quests) {
   if (list.length) {
     return el('div', { class: 'dg-bar dg-import' },
       el('div', { class: 'dg-bar-row' },
-        el('span', { class: 'dg-bar-title', text: '⚔ ' + (last ? `Synced ${ago(last)}` : 'Sync from the game') }),
+        Date.now() - liveAt < 180000
+          ? el('span', { class: 'dg-bar-title dg-live-dot', text: '● Live: following your game' })
+          : el('span', { class: 'dg-bar-title', text: '⚔ ' + (last ? `Synced ${ago(last)}` : 'Sync from the game') }),
         el('a', { class: 'dg-bar-link', href: 'sync.html' }, 'how to sync')),
       msg,
       el('details', { class: 'dg-import-file', open: fileOpen }, el('summary', { text: 'load a saves file' }), input, drop, choose));

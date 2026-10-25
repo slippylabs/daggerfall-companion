@@ -1,7 +1,7 @@
 // Route planner: the order to visit a set of places from where the player stands, using the game's own
 // travel times. Exact (Held-Karp) up to 12 stops; nearest neighbour + 2-opt beyond that.
 // A stop can name stops that must come before it (a quest's reward after its job is done).
-import { travelBetween } from './data.js?v=13';
+import { travelBetween } from './data.js?v=14';
 
 // stops: [{loc, deadlineMin?, after?: [stop index...]}]; returns {order: [index...], legs: [minutes...], total, late: [index...]}
 export function planRoute(start, stops, opts, { returnHome = false } = {}) {

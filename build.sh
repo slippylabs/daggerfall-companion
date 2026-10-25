@@ -9,6 +9,7 @@ node tools/build-towns.mjs
 node tools/build-quests.mjs
 node tools/build-roads.mjs
 node tools/build-dungeons.mjs
+node tools/build-walk.mjs
 node tools/build-names.mjs
 node tools/build-ui.mjs
 node tools/verify.mjs
@@ -16,4 +17,5 @@ node tools/test-recognise.mjs
 node tools/test-route.mjs
 node tools/test-save.mjs
 node tools/test-now.mjs
+node tools/test-walk.mjs
 find site/data -type f \( -name '*.json' -o -name '*.bin' \) -exec gzip -9 -kf {} \;

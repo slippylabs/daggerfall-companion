@@ -1,11 +1,12 @@
 // Dungeon maps: the floors of a dungeon's blocks seen from above (tools/build-dungeons.mjs), the entrance, and,
 // from a save, the exact spot the quest put its person, foe or item. One level at a time or all at once.
-import { data } from './data.js?v=13';
-import { el, fill } from './ui.js?v=13';
+import { data } from './data.js?v=14';
+import { el, fill } from './ui.js?v=14';
+import { makeGrid, route, describe } from './dungeonRoute.js?v=14';
 
 const SIDE = 51.2, N = 128, BAND = 3.2;
 const V = '1';
-const cache = { regions: {}, blocks: {}, index: null };
+const cache = { regions: {}, blocks: {}, walks: {}, index: null };
 const getJson = p => fetch(`${p}?v=${V}`).then(r => { if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); return r.json(); });
 
 export async function dungeonBlocks(i) {
@@ -13,6 +14,8 @@ export async function dungeonBlocks(i) {
   cache.regions[r] ||= getJson(`data/dungeons/r${String(r).padStart(2, '0')}.json`).catch(() => ({}));
   return (await cache.regions[r])[i] || null;
 }
+const walkGrid = name => (cache.walks[name] ||= fetch(`data/rdb/${name}.walk.bin?v=1`)
+  .then(r => (r.ok ? r.arrayBuffer() : null)).then(b => (b ? new Uint8Array(b) : null)).catch(() => null));
 const blockGrid = name => (cache.blocks[name] ||= fetch(`data/rdb/${name}.bin?v=${V}`)
   .then(r => r.arrayBuffer()).then(b => new Uint16Array(b)));
 const blockIndex = () => (cache.index ||= getJson('data/rdb/index.json'));
@@ -61,6 +64,8 @@ export async function showDungeon(box, i, targets = []) {
     return g ? { ...world(t.bx, t.bz, t.x, t.y, t.z), band: standingBand(g, t.x, t.y, t.z), label: t.label } : null;
   }).filter(Boolean);
 
+  // the walking route from the entrance to the (first) quest target, found once the walk grids are in
+  let path = null, trip = null, routeDone = !marks.length || !entrance;
   let used = 0;
   for (const g of grids) for (const v of g) used |= v;
   const bands = [...Array(16).keys()].filter(k => (used >> k) & 1);
@@ -114,11 +119,36 @@ export async function showDungeon(box, i, targets = []) {
       ctx.fillStyle = 'rgba(231,212,168,0.95)'; ctx.fillRect(lx - 4, y - 10 * devicePixelRatio, tw + 8, 18 * devicePixelRatio);
       ctx.fillStyle = '#2a1a0b'; ctx.fillText(label, lx, y + 4 * devicePixelRatio);
     };
+    if (path) drawRoute(ox, oy, s);
     if (entrance) pin(entrance, '#5ab8ff', 'Entrance');
     marks.forEach(m => pin(m, '#ff4655', m.label));
     ctx.fillStyle = 'rgba(217,251,232,0.8)';
     ctx.font = `bold ${12 * devicePixelRatio}px 'EB Garamond', Georgia, serif`;
     ctx.fillText('N ↑', canvas.width - 40 * devicePixelRatio, 16 * devicePixelRatio);
+  }
+  // the route: a gold line with a dark casing, solid on the shown level, dashed where it runs above or below it;
+  // a climb is marked ▲ and a drop ▼
+  function drawRoute(ox, oy, s) {
+    const onLevel = h => level < 0 || Math.abs(Math.floor(h / BAND) - level) <= 1;
+    const pt = p => [ox + (p[0] + 0.5) * s, oy + (p[1] + 0.5) * s];
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    for (const pass of [0, 1]) {
+      for (let i = 1; i < path.length; i++) {
+        const on = onLevel(path[i][2]);
+        ctx.setLineDash(on ? [] : [4 * devicePixelRatio, 4 * devicePixelRatio]);
+        ctx.strokeStyle = pass ? (on ? '#f2cd52' : 'rgba(242,205,82,0.55)') : 'rgba(20,10,0,0.85)';
+        ctx.lineWidth = (pass ? 3.4 : 6.4) * devicePixelRatio;
+        ctx.beginPath(); ctx.moveTo(...pt(path[i - 1])); ctx.lineTo(...pt(path[i])); ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+    ctx.font = `700 ${13 * devicePixelRatio}px Georgia, serif`;
+    for (const c of trip.climbs) mark(pt(path[c.at]), '▲', '#3a8f3a');
+    for (const d of trip.drops) mark(pt(path[d.at]), '▼', '#b03020');
+    function mark([x, y], ch, colour) {
+      ctx.fillStyle = 'rgba(238,222,190,0.95)'; ctx.beginPath(); ctx.arc(x, y, 8 * devicePixelRatio, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = colour; ctx.textAlign = 'center'; ctx.fillText(ch, x, y + 5 * devicePixelRatio); ctx.textAlign = 'start';
+    }
   }
   // drag to pan, wheel or buttons to zoom
   const pointers = new Map();
@@ -147,12 +177,14 @@ export async function showDungeon(box, i, targets = []) {
     return d === 0 ? 'Entrance level' : `${Math.abs(d)} m ${d > 0 ? 'above' : 'below'} the entrance`;
   }
 
+  const routeLine = el('div', { class: 'dg-route-line', text: routeDone ? '' : 'Finding the way through the corridors…' });
   compose();
   fill(box,
     marks.length && entrance ? el('div', { class: 'dg-reward dg-town-mark' },
       el('div', { class: 'dg-reward-label', text: 'Your quest target' }),
       ...marks.map(m => el('div', {}, el('b', { text: m.label }), ` is ${directions(entrance, m)}.`)),
-      el('div', { class: 'dg-dim', text: 'Red pin on the map; the level picker shows its floor. Distances are straight lines: the corridors wind.' })) : null,
+      routeLine,
+      el('div', { class: 'dg-dim', text: 'Follow the gold line from the blue entrance to the red pin; it is solid on the level shown and dashed above or below it.' })) : null,
     !marks.length && targets.length ? el('p', { class: 'tool-note', text: 'The quest spot is not on this map.' }) : null,
     el('div', { class: 'tool-controls dg-dungeon-controls' },
       levelSel,
@@ -162,5 +194,30 @@ export async function showDungeon(box, i, targets = []) {
     el('p', { class: 'tool-note', text: `${list.length} blocks, ${Math.round((bands[bands.length - 1] - bands[0] + 1) * BAND)} m from top to bottom, drawn from the game's own dungeon models. Blue: where you come in. Drag to move, wheel or +/− to zoom.` }));
   new ResizeObserver(draw).observe(canvas.parentElement);
   draw();
+  if (!routeDone) findRoute();
   return true;
+
+  async function findRoute() {
+    const walks = {};
+    await Promise.all(list.map(async b => { walks[b[2]] = await walkGrid(b[2]); }));
+    const g = makeGrid(list, walks);
+    const s0b = list.find(b => b[3]), t = targets[0];
+    const from = g.nodeAt(s0b[0], s0b[1], ...index[s0b[2]].start[0]), to = g.nodeAt(t.bx, t.bz, t.x, t.y, t.z);
+    path = from && to ? route(g, from, to) : null;
+    routeDone = true;
+    if (!path) {
+      fill(routeLine, el('b', { text: 'No walking route found. ' }), 'The way there needs a hidden door, swimming or levitation; head for the red pin by the directions above.');
+      return;
+    }
+    trip = describe(path);
+    const bits = [`about ${Math.round(trip.metres / 5) * 5} m of corridor`];
+    if (trip.downs || trip.ups) bits.push(`stairs or ramps ${[trip.downs ? `down ${trip.downs}×` : '', trip.ups ? `up ${trip.ups}×` : ''].filter(Boolean).join(', ')}`);
+    if (trip.climbs.length) bits.push(`climb ${trip.climbs.length === 1 ? 'one wall' : `${trip.climbs.length} walls`} (▲)`);
+    if (trip.drops.length) bits.push(`drop off ${trip.drops.length === 1 ? 'one ledge' : `${trip.drops.length} ledges`} (▼${trip.drops.some(d => d.m > 6) ? ', a long fall: fall damage' : ''})`);
+    fill(routeLine, el('b', { text: 'Route: ' }), bits.join(' · ') + '.');
+    // the levels the route uses, marked in the picker
+    const usedBands = new Set(path.map(p => Math.floor(p[2] / BAND)));
+    for (const o of levelSel.options) if (+o.value >= 0 && (usedBands.has(+o.value) || usedBands.has(+o.value + 1)) && !/route/.test(o.text)) o.text += ' · route';
+    draw();
+  }
 }

@@ -354,3 +354,8 @@ code { color: var(--gold); }
 .dg-dungeon-fold > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-family: var(--caps); color: var(--gold); letter-spacing: 0.05em; }
 .dg-dungeon-fold[hidden] { display: none; }
 .dg-legend-diamond { display: inline-block; width: 10px; height: 10px; margin-right: 6px; background: #f2cd52; border: 1.5px solid #2a1a0b; transform: rotate(45deg); vertical-align: middle; }
+/* live sync */
+.dg-live-dot { color: #9fe39a; }
+.dg-sync-status.dg-live { border-color: rgba(159, 227, 154, 0.5); }
+.dg-fresh { box-shadow: 0 0 0 3px var(--gold), inset 0 0 24px rgba(90, 50, 15, 0.35), 0 4px 12px rgba(0, 0, 0, 0.55); }
+.dg-route-line { margin-top: 4px; }

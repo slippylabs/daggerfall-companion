@@ -1,12 +1,12 @@
 // Entry point: load the data, wire the shared "I am in" header and the tabs.
-import { data, loadCore, regionName, typeWord } from './data.js?v=13';
-import { state, setHere, setOpts, onChange, registerTabs } from './state.js?v=13';
-import { autocomplete } from './ui.js?v=13';
-import { initMap } from './map.js?v=13';
-import { initJournal } from './journal.js?v=13';
-import { initQuests, setQuestTabs } from './quests.js?v=13';
-import { initTowns, townsShown } from './towns.js?v=13';
-import { initMyQuests, renderMine, loadSnapshot, hasQuests } from './myquests.js?v=13';
+import { data, loadCore, regionName, typeWord } from './data.js?v=14';
+import { state, setHere, setOpts, onChange, registerTabs } from './state.js?v=14';
+import { autocomplete } from './ui.js?v=14';
+import { initMap } from './map.js?v=14';
+import { initJournal } from './journal.js?v=14';
+import { initQuests, setQuestTabs } from './quests.js?v=14';
+import { initTowns, townsShown } from './towns.js?v=14';
+import { initMyQuests, renderMine, loadSnapshot, hasQuests } from './myquests.js?v=14';
 
 const $ = id => document.getElementById(id);
 const TABS = ['journal', 'map', 'quests', 'towns', 'mine'];
@@ -41,17 +41,22 @@ function startSync() {
   const say = (text, cls = '') => { status.hidden = false; status.className = `tool-note dg-sync-status ${cls}`; status.textContent = text; };
   if (!window.opener) { say('Open DFO Online and click your ⚔ Sync quests bookmark there.'); return; }
   say('Waiting for DFO Online to send your quests…');
-  let done = false;
-  addEventListener('message', async e => {
-    if (!allowed.has(e.origin) || e.data?.type !== 'dg-sync' || done) return;
+  // the bookmark keeps watching and sends a fresh copy whenever the save changes: every one is taken
+  let done = false, first = true, busy = Promise.resolve();
+  addEventListener('message', e => {
+    if (!allowed.has(e.origin) || e.data?.type !== 'dg-sync') return;
     done = true;
     const p = e.data.payload || {};
-    if (p.error || !p.snap?.quest) { say(p.error || 'DFO Online sent no quests.', 'dg-bad'); return; }
-    try {
-      const n = await loadSnapshot(p.snap, p.info || null, 'sync');
-      say(`Synced ${n} quest${n === 1 ? '' : 's'} from DFO Online.`, 'dg-good');
-      setTimeout(() => { status.hidden = true; }, 6000);
-    } catch (err) { say(`Could not read the quests: ${err.message}`, 'dg-bad'); }
+    busy = busy.then(async () => {
+      if (p.error || !p.snap?.quest) { say(p.error || 'DFO Online sent no quests.', 'dg-bad'); return; }
+      try {
+        // the first copy opens My quests; later ones update it quietly, wherever the player is looking
+        const n = await loadSnapshot(p.snap, p.info || null, first ? 'sync' : 'live');
+        first = false;
+        const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        say(`● Live: updated ${t} (${n} quest${n === 1 ? '' : 's'}). This page follows your game while DFO Online stays open.`, 'dg-good dg-live');
+      } catch (err) { say(`Could not read the quests: ${err.message}`, 'dg-bad'); }
+    });
   });
   // say "ready" until the quests arrive (the bookmark may still be fetching the online save)
   const ping = () => { if (done) return; for (const o of allowed) { try { window.opener.postMessage('dg-ready', o); } catch { /* closed */ } } };

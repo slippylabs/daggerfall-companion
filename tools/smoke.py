@@ -271,6 +271,11 @@ def run(base, width, height, mobile):
         check('of the entrance' in spot and page.locator('#dungeon-view canvas').count() == 1 and page.is_hidden('#town-cols'),
               f'[{tag}] Dungeon map: the werewolf is pinned with directions ({spot.splitlines()[1][:80]})')
         check('quest target' in page.inner_text('#dungeon-view .dg-level'), f'[{tag}] dungeon map: the level picker opens on the target level')
+        page.wait_for_function('document.querySelector("#dungeon-view .dg-route-line")?.innerText.includes("Route:")', timeout=20000)
+        rl = page.inner_text('#dungeon-view .dg-route-line')
+        gold = page.evaluate('''() => { const c = document.querySelector('#dungeon-view canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+          let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 225 && d[i + 1] > 180 && d[i + 1] < 220 && d[i + 2] < 120) n++; return n; }''')
+        check('m of corridor' in rl and gold > 100, f'[{tag}] dungeon route drawn through the corridors ({rl[:90]}; {gold} px)')
         page.screenshot(path=str(SHOTS / f'dungeon_{tag}.png'), full_page=True)
         page.click('.hud-tab[data-tab="mine"]')
         page.wait_for_selector('#mine-list .dg-mine')
@@ -306,6 +311,8 @@ def run(base, width, height, mobile):
 
 REALM_ID = 'r' + '0123456789abcdef0123'
 REALM_SAVE = (Path(__file__).resolve().parent / 'fixtures' / 'realm-save.json').read_bytes()
+REALM_LATER = (Path(__file__).resolve().parent / 'fixtures' / 'realm-save-later.json').read_bytes()
+REALM = {'seq': 1, 'body': REALM_SAVE, 'data_gets': 0}   # the fake account service's character, changed mid-test
 
 
 def serve_fake_dfo():
@@ -318,9 +325,10 @@ def serve_fake_dfo():
         def do_GET(self):
             auth = self.headers.get('Authorization') == 'Bearer test-secret'
             if self.path == '/v1/realm' and auth:
-                body, ctype = (b'{"characters":[{"id":"%s","name":"Slippy","playing":true,"updatedAt":1}],"max":3}' % REALM_ID.encode()), 'application/json'
+                body, ctype = (b'{"characters":[{"id":"%s","name":"Slippy","playing":true,"updatedAt":1,"seq":%d}],"max":3}' % (REALM_ID.encode(), REALM['seq'])), 'application/json'
             elif self.path == f'/v1/realm/{REALM_ID}/data' and auth:
-                body, ctype = REALM_SAVE, 'application/octet-stream'
+                REALM['data_gets'] += 1
+                body, ctype = REALM['body'], 'application/octet-stream'
             elif self.path.startswith('/v1/'):
                 self.send_response(401); self.end_headers(); return
             else:
@@ -341,13 +349,15 @@ def run_sync(base):
     guide = f'{base}?dfo={dfo}'
     code = (SITE / 'js' / 'bookmarklet.js').read_text()
     code = code.replace("GUIDE = 'https://daggerfall.slippylabs.com/'", f"GUIDE = {guide!r}").replace(r"DFO_HOST = /(^|\.)daggerfalljs\.dev$/", r"DFO_HOST = /^127\.0\.0\.1$/")
-    assert '127' in code.split('\n')[8], 'bookmarklet constants not replaced'
+    assert guide in code and r'/^127\.0\.0\.1$/' in code, 'bookmarklet constants not replaced'
     with sync_playwright() as p:
         browser = p.chromium.launch()
         for kind in ['realm', 'local']:
+            REALM.update(seq=1, body=REALM_SAVE, data_gets=0)
             ctx = browser.new_context(viewport={'width': 1280, 'height': 900})
             page = ctx.new_page()
             page.goto(dfo + '/')
+            page.evaluate('window.__dgSyncMs = 700')   # the watcher's minute, shortened for the test
             if kind == 'realm':
                 page.evaluate(f"localStorage.setItem('dagger.account.session', JSON.stringify({{secret: 'test-secret'}})); localStorage.setItem('dagger.account.service', {dfo!r})")
             else:
@@ -357,9 +367,25 @@ def run_sync(base):
             g = pop.value
             g.wait_for_selector('#mine-list .dg-mine-now', timeout=20000)
             status = g.inner_text('#sync-status')
-            check(g.locator('#mine-list .dg-mine-now').count() == 2 and 'Synced 2 quests' in status,
-                  f'[sync/{kind}] the bookmark sends both quests to the guide ({status})')
+            check(g.locator('#mine-list .dg-mine-now').count() == 2 and 'Live' in status,
+                  f'[sync/{kind}] the bookmark sends both quests to the guide ({status[:40]})')
             check('Wickford Residence' in g.inner_text('#mine-list'), f'[sync/{kind}] synced quests carry their exact places')
+            # live: the game saves again (the delivery done); the guide follows without another click
+            g.click('.hud-tab[data-tab="towns"]')
+            if kind == 'realm':
+                page.wait_for_timeout(2000)
+                check(REALM['data_gets'] == 1, f'[sync/realm] an unchanged save is not fetched again ({REALM["data_gets"]} fetch)')
+                REALM.update(seq=2, body=REALM_LATER)
+            else:
+                page.evaluate("([s]) => { localStorage.setItem('dagger.save.0', s); localStorage.setItem('dagger.saveinfo.0', JSON.stringify({characterName: 'Slippy', saveName: 'QuickSave', dateAndTime: {realTime: 9, gameTime: 527010}})); }", [REALM_LATER.decode()])
+            g.wait_for_function('document.querySelectorAll("#mine-list .dg-mine-now").length === 1', timeout=15000)
+            check(g.evaluate('state => !document.querySelector("#tab-towns").hidden', None), f'[sync/{kind}] live update leaves the page where the player is (towns tab)')
+            check('Lycanthrope' in g.inner_text('#mine-list') and 'Delivery' not in g.inner_text('#mine-list'),
+                  f'[sync/{kind}] live: the finished delivery drops off by itself')
+            page.evaluate(code)   # a second click: the same guide window, no popup
+            page.wait_for_timeout(1500)
+            check(page.evaluate('window.__dgSyncCount') == 1 and g.locator('#mine-list .dg-mine-now').count() == 1,
+                  f'[sync/{kind}] a second click resends to the same window and starts no second watcher')
             ctx.close()
         # a page on another origin cannot push quests into the guide
         ctx = browser.new_context()
