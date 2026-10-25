@@ -61,11 +61,14 @@ for (const name of ['Daggerfall', 'Ruins of Wickston Manor', 'The Fortress of Ma
   const towns = load('data/towns/r17.json');
   const id = locs.name.findIndex((n, k) => n === 'Daggerfall' && locs.region[k] === 17);
   const city = towns.towns[id];
-  const all = city.b.length + city.houses.length / 4;
+  const all = city.b.length + city.houses.length / 5;
   check(all === 647, `Daggerfall city has 647 buildings (${all})`);
   const byKey = k => city.b.find(r => r[8] === k);
   check(byKey(197899)?.[0] === 'The Fighters Guild', 'building 197899 is The Fighters Guild');
   check(byKey(66048)?.[0] === 'The Mages Guild', 'building 66048 is The Mages Guild');
+  // the quest houses of the in-game test (The Yeoming / The Wickford Residence) are houses here, by key
+  const houseKeys = new Set(city.houses.filter((_, k) => k % 5 === 4));
+  check(houseKeys.has(328197) && houseKeys.has(328965), 'quest houses 328197 and 328965 are Daggerfall houses');
   check(city.b.some(r => r[0] === 'The Bank of the Empire' && r[9] === 'The Bank of Daggerfall'), 'banks use DFO Online naming (Bank of the Empire)');
 }
 

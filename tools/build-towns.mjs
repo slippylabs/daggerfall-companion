@@ -55,11 +55,12 @@ for (let r = 0; r < maps.regionCount; r++) {
     const layout = layoutLocation(loc, maps, blocks, { enhanced: false, windmills: false });
     const opts = nameOpts(r, loc);
     const list = buildingSummaries(loc.exterior.buildings, layout.blocks, opts);
-    // Houses have no name until a quest names one, so they are kept as bare positions for the map
+    // Houses have no name until a quest names one, so they are kept as positions + building key (the key a
+    // quest site in a save names: DFO place.js makeBuildingKey(blockX, blockY, record))
     const houses = [];
     for (const b of list) {
       if (b.isResidence && !b.name)
-        houses.push(b.blockX, b.blockY, Math.round(b.position[0]), Math.round(b.position[2]));
+        houses.push(b.blockX, b.blockY, Math.round(b.position[0]), Math.round(b.position[2]), b.buildingKey);
     }
     const rows = list.filter(b => !(b.isResidence && !b.name)).map(b => {
       const row = [b.name, b.buildingType, b.factionId, b.quality, b.blockX, b.blockY,
@@ -74,7 +75,7 @@ for (let r = 0; r < maps.regionCount; r++) {
     const id = indexOf.get(`${r}:${loc.name}`);
     out[id] = { name: loc.name, w: layout.width, h: layout.height, b: rows, houses };
     towns++;
-    buildings += rows.length + houses.length / 4;
+    buildings += rows.length + houses.length / 5;
   }
   const json = JSON.stringify({ region: r, buildingTypes: typeNames, towns: out });
   biggest = Math.max(biggest, json.length);

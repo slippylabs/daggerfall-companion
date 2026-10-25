@@ -1,12 +1,13 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=7';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=7';
-import { state } from './state.js?v=7';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=8';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=8';
+import { state } from './state.js?v=8';
 
 const $ = id => document.getElementById(id);
 const canvas = $('town-canvas'), ctx = canvas.getContext('2d');
 const BLOCK = 102.4;   // one RMB block is 4096 Daggerfall units = 102.4 m
-let current = null, highlight = null, tabs = null;
+let current = null, highlight = null, mark = null, tabs = null;
+const HOUSE = 5;   // houses: [blockX, blockY, x, z, buildingKey] per house
 
 const COLOURS = {
   GuildHall: '#ff9130', Temple: '#ffe066', Tavern: '#b07cff', Palace: '#ff4655', Bank: '#5ab8ff', Library: '#7fe0ff',
@@ -25,7 +26,7 @@ const FRIENDLY = {
 export function initTowns(tabApi) {
   tabs = tabApi;
   autocomplete($('town-input'), $('town-suggest'), { onPick: i => openTown(i), filter: i => data.locs.type[i] !== 14 });
-  $('building-search').addEventListener('input', () => { renderList(); drawMap(); });
+  $('building-search').addEventListener('input', () => { mark = null; renderList(); drawMap(); });
   new ResizeObserver(() => drawMap()).observe(canvas.parentElement);
 }
 
@@ -35,21 +36,48 @@ export function townsShown() {
 }
 
 let loading = null;
-export async function openTown(i, buildingName = null) {
+// A building by its key (the key a quest site in a save names): {bx, by, x, z} or null
+function byKey(town, key) {
+  const b = town.b.find(r => r[8] === key);
+  if (b) return { bx: b[4], by: b[5], x: b[6], z: b[7] };
+  for (let k = 0; k < town.houses.length; k += HOUSE)
+    if (town.houses[k + 4] === key) return { bx: town.houses[k], by: town.houses[k + 1], x: town.houses[k + 2], z: town.houses[k + 3] };
+  return null;
+}
+
+// Where a building stands in its town, in words: "in the north-east part of town, about 180 m from the middle"
+const PARTS = ['east', 'north-east', 'north', 'north-west', 'west', 'south-west', 'south', 'south-east'];
+function whereInTown(town, p) {
+  const dx = p.bx * BLOCK + p.x - town.w * BLOCK / 2, dy = p.by * BLOCK + p.z - town.h * BLOCK / 2;
+  const m = Math.hypot(dx, dy);
+  if (m < 40) return 'right in the middle of town';
+  const part = PARTS[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8];
+  return `in the ${part} part of town, about ${Math.round(m / 10) * 10} m from the middle`;
+}
+
+// opts.key: a quest building's key from a save (a house has no name on any map until the quest names it)
+export async function openTown(i, buildingName = null, opts = {}) {
   if (state.tab !== 'towns') tabs?.show('towns');
   loading = i;
   const file = await loadTowns(data.locs.region[i]);
   if (loading !== i) return;   // a later pick won
   loading = null;
   current = { i, file, town: file.towns[i] || null };
-  highlight = buildingName;
+  const at = opts.key && current.town ? byKey(current.town, opts.key) : null;
+  mark = at ? { ...at, name: buildingName } : null;
+  highlight = mark ? null : buildingName;
   $('town-input').value = data.locs.name[i];
-  $('building-search').value = buildingName || '';
+  $('building-search').value = mark ? '' : buildingName || '';
   fill($('town-head'), 
     el('div', { class: 'dg-card-head' },
       el('span', { class: 'dg-card-name', text: data.locs.name[i] }),
       el('span', { class: 'dg-tag', text: `${typeWord(i)} · ${regionName(data.locs.region[i])}` })),
     el('div', { class: 'dg-card-trip' }, travelLine(i)),
+    mark ? el('div', { class: 'dg-reward dg-town-mark' },
+      el('div', { class: 'dg-reward-label', text: 'Your quest building' }),
+      el('div', { class: 'dg-reward-who', text: buildingName }),
+      el('div', {}, `It stands ${whereInTown(current.town, mark)} (circled on the map, north is up).`)) : null,
+    opts.key && !mark && current.town ? el('p', { class: 'tool-note', text: `${buildingName}: this building is not on the guide's map of ${data.locs.name[i]}. Ask townspeople "Where is…" in the talk window.` }) : null,
     current.town ? null : el('p', { class: 'tool-note', text: 'This place has no buildings on its map (a dungeon or an empty spot).' }));
   renderList();
   drawMap();
@@ -70,13 +98,13 @@ function renderList() {
   }
   const keys = [...groups.keys()].sort((a, b) => (ORDER.indexOf(a) + 1 || 99) - (ORDER.indexOf(b) + 1 || 99));
   fill(box, 
-    el('p', { class: 'tool-note', text: `${town.b.length} named buildings and ${town.houses.length / 4} houses. Houses are named only when a quest picks one.` }),
+    el('p', { class: 'tool-note', text: `${town.b.length} named buildings and ${town.houses.length / HOUSE} houses. Houses are named only when a quest picks one.` }),
     ...keys.map(t => el('div', { class: 'dg-bgroup' },
       el('h3', {}, el('span', { class: 'dg-legend-dot', style: `background:${colourFor(t)}` }), FRIENDLY[t] || t),
       el('ul', {}, groups.get(t).sort((a, b) => a[0].localeCompare(b[0])).map(b => el('li', {},
         el('button', {
           class: 'dg-link' + (b[0] === highlight ? ' dg-on' : ''),
-          onclick: () => { highlight = b[0]; renderList(); drawMap(); },
+          onclick: () => { highlight = b[0]; mark = null; renderList(); drawMap(); },
         }, b[0] || '(unnamed)', b[9] ? el('span', { class: 'dg-dim', text: ` (offline: ${b[9]})` }) : null)))))),
     rows.length ? null : el('p', { class: 'tool-note', text: 'No building with that name here. If it is a house ("The … Residence"), the quest named it — ask townspeople where it is.' }));
 }
@@ -106,7 +134,7 @@ function drawMap() {
 
   const r = Math.max(2.5 * devicePixelRatio, s * 3);
   ctx.fillStyle = 'rgba(127,166,149,0.55)';
-  for (let k = 0; k < town.houses.length; k += 4)
+  for (let k = 0; k < town.houses.length; k += HOUSE)
     ctx.fillRect(X(town.houses[k], town.houses[k + 2]) - r / 2, Y(town.houses[k + 1], town.houses[k + 3]) - r / 2, r, r);
   let hl = null;
   for (const b of town.b) {
@@ -116,13 +144,21 @@ function drawMap() {
     ctx.fillRect(x - r * 0.7, y - r * 0.7, r * 1.4, r * 1.4);
     if (b[0] === highlight) hl = { x, y, name: b[0] };
   }
+  if (mark) hl = { x: X(mark.bx, mark.x), y: Y(mark.by, mark.z), name: mark.name };
   if (hl) {
+    // a quest house: a red dot inside the ring, so it stands out among the grey houses
+    if (mark) {
+      ctx.fillStyle = '#ff4655';
+      ctx.beginPath(); ctx.arc(hl.x, hl.y, r * 1.2, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2.5 * devicePixelRatio;
-    ctx.beginPath(); ctx.arc(hl.x, hl.y, r * 3, 0, Math.PI * 2); ctx.stroke();
+    const ring = r * 3;
+    ctx.beginPath(); ctx.arc(hl.x, hl.y, ring, 0, Math.PI * 2); ctx.stroke();
     ctx.font = `600 ${14 * devicePixelRatio}px 'EB Garamond', Georgia, serif`;
     const w = ctx.measureText(hl.name).width;
-    const lx = Math.min(hl.x + r * 3 + 4, canvas.width - w - 10);
+    // label to the right of the ring, or to its left when it would run off the canvas
+    const lx = hl.x + ring + 6 + w + 4 <= canvas.width ? hl.x + ring + 6 : Math.max(4, hl.x - ring - 6 - w);
     ctx.fillStyle = 'rgba(231,212,168,0.95)';
     ctx.fillRect(lx - 4, hl.y - 10 * devicePixelRatio, w + 8, 18 * devicePixelRatio);
     ctx.fillStyle = '#2a1a0b';

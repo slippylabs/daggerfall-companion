@@ -3,7 +3,7 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=7';
+import { data } from './data.js?v=8';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -90,7 +90,7 @@ export function questsInSave(snap, quests) {
     const key = sym => sym && (q.resources[sym] ? sym : q.resources[`_${String(sym).replace(/^_+|_+$/g, '')}_`] ? `_${String(sym).replace(/^_+|_+$/g, '')}_` : null);
     const res = new Map((sq.resources || []).map(r => [r.symbol?.original, r]));
     const site = sym => res.get(sym)?.resourceSpecific?.siteDetails || null;
-    const names = {}, days = {}, locs = {};
+    const names = {}, days = {}, locs = {}, buildings = {};
     // the blanks as the game fills them: a person _name_ __building_ ___town_ ____region_ (Person.expandMacro);
     // a place _building_ __town_ ___town_ ____region_ (Place.expandMacro)
     const put = (k, sd, n) => {
@@ -100,6 +100,9 @@ export function questsInSave(snap, quests) {
       if (Object.keys(n).length) names[k] = n;
       const loc = sd ? byMapId.get(sd.mapId) : undefined;
       if (loc !== undefined) locs[k] = loc;
+      // the exact building (a house set aside by DFO's quest shelf keeps its key under `unseated`)
+      const key = sd?.buildingKey || sd?.unseated?.buildingKey;
+      if (loc !== undefined && key > 0 && sd.buildingName) buildings[k] = { loc, key, name: sd.buildingName };
     };
     const clocks = {};
     for (const [orig, r] of res) {
@@ -116,7 +119,7 @@ export function questsInSave(snap, quests) {
     }
     // days left: the quest's own timer, else the tightest running clock
     const daysLeft = clocks[q.timer] ?? (Object.keys(clocks).length ? Math.min(...Object.values(clocks)) : null);
-    out.push({ q, names, days, daysLeft, locs, uid: sq.uid });
+    out.push({ q, names, days, daysLeft, locs, buildings, uid: sq.uid });
   }
   return { found: out, unknown };
 }

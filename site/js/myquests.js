@@ -1,13 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=7';
-import { el, fill } from './ui.js?v=7';
-import { state, onChange, showOnMap, setHere } from './state.js?v=7';
-import { rewardGivers, nameFor, stepText } from './questText.js?v=7';
-import { showQuest } from './quests.js?v=7';
-import { planRoute } from './route.js?v=7';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=7';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName } from './data.js?v=8';
+import { el, fill } from './ui.js?v=8';
+import { state, onChange, showOnMap, setHere } from './state.js?v=8';
+import { rewardGivers, nameFor, stepText } from './questText.js?v=8';
+import { showQuest } from './quests.js?v=8';
+import { openTown } from './towns.js?v=8';
+import { planRoute } from './route.js?v=8';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=8';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -90,7 +91,7 @@ export function applySave(found, character) {
       || list.find(x => x.file === f.q.file && x.uid == null && compatible(x.names, f.names));
     if (e) refreshed++;
     else { e = { file: f.q.file, done: [], jobDone: false, saved: Date.now() }; list.unshift(e); added++; }
-    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, uid: f.uid, character });
+    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, uid: f.uid, character });
     e.key = f.q.file + '|' + JSON.stringify(f.names);
     seen.add(e);
   }
@@ -169,7 +170,8 @@ async function render() {
               : el('span', { class: 'dg-dim', text: 'set "I am in" for the trip' }),
           ' ', el('button', { class: 'dg-link', onclick: () => showOnMap(d.loc) }, 'map'));
       })),
-      dests.length ? null : el('div', { class: 'dg-dim', text: 'No places known yet: save it from a pasted journal entry to fill them in.' }),
+      dests.length ? null : el('div', { class: 'dg-dim', text: 'No places known yet: load your game save above to fill them in.' }),
+      inTown(q, entry),
       el('div', { class: 'dg-card-actions' },
         el('label', { class: 'dg-days-label' }, 'Game days left ', left),
         el('button', { class: 'tool-btn', onclick: () => showQuest(q, entry.names, entry.days) }, 'Walkthrough'),
@@ -221,6 +223,30 @@ function importCard(quests) {
       el('li', {}, 'Choose that file here. It is read on your device only, nothing is uploaded.'),
       el('li', { class: 'dg-dim' }, 'Playing an online (realm) character? Copy it to offline first so it shows in the Load list, then export.')),
     input, drop, choose, msg);
+}
+
+// ---- where in town: the quest's people and places that are inside a building ----
+function inTown(q, entry) {
+  const rows = [];
+  for (const [sym, r] of Object.entries(q.resources)) {
+    if (r.kind !== 'Person' && r.kind !== 'Place') continue;
+    const exact = entry.buildings?.[sym];
+    const n = entry.names?.[sym] || {};
+    const name = exact?.name || n[2];
+    if (!name) continue;
+    const loc = exact?.loc ?? entry.locs?.[sym] ?? locationsNamed(n[3], state.here, state.opts)[0];
+    if (loc === undefined) continue;
+    if (rows.some(x => x.loc === loc && x.name === name)) continue;
+    const who = r.kind === 'Person' ? (n[1] || r.role) : r.role;
+    rows.push({ loc, name, key: exact?.key, who, pays: q.reward.from.some(f => f.sym === sym) });
+  }
+  if (!rows.length) return null;
+  return el('div', { class: 'dg-intown' },
+    el('b', { text: 'Where in town' }),
+    el('ul', { class: 'dg-trips' }, rows.map(x => el('li', {},
+      el('b', { text: x.who }), x.pays ? el('span', { class: 'dg-tag dg-tag-good', text: 'pays' }) : '',
+      ` — ${x.name}, ${data.locs.name[x.loc]} `,
+      el('button', { class: 'dg-link', onclick: () => openTown(x.loc, x.name, { key: x.key }) }, 'find it')))));
 }
 
 // ---- progress: tick the steps off; the next one is spelled out ----

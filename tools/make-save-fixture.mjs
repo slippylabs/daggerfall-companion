@@ -1,6 +1,7 @@
 // Writes tools/fixtures/DFO-Online-Saves.zip with DFO Online's own exporter (saveTransfer.js exportSavesZip),
 // holding two saves of one character shaped by DFO's serializers (Quest/Person/Place/Clock getSaveData):
 //   SAVE0 (older): The Delivery Boy + Hunt for a Lycanthrope
+// with the building keys of the in-game Daggerfall Unity test (328197 The Yeoming, 328965 The Wickford Residence)
 //   SAVE1 (newer): The Delivery Boy only (the hunt is finished), saved outdoors at Penbrugh
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,9 +12,9 @@ const L = JSON.parse(readFileSync(join(SITE, 'data/locations.json'), 'utf8'));
 const at = name => { const i = L.name.indexOf(name); if (i < 0) throw new Error(`no location ${name}`); return { mapId: L.mapId[i], px: L.px[i], py: L.py[i] }; };
 const DAGGERFALL = at('Daggerfall'), WICKSTON = at('Ruins of Wickston Manor'), PENBRUGH = at('Penbrugh');
 
-const site = (loc, locationName, buildingName = null, siteType = 0) => ({
+const site = (loc, locationName, buildingName = null, siteType = 0, buildingKey = 0) => ({
   questUID: 0, siteType, mapId: loc.mapId, locationId: 0, regionIndex: 17, regionName: 'Daggerfall', locationName,
-  buildingKey: buildingName ? 197899 : 0, buildingName, magicNumberIndex: 0, questSpawnMarkers: null, questItemMarkers: null,
+  buildingKey, buildingName, magicNumberIndex: 0, questSpawnMarkers: null, questItemMarkers: null,
   selectedMarker: { targetResources: null },
 });
 const res = (type, original, resourceSpecific) => ({ type, symbol: { original }, infoMessageID: -1, usedMessageID: -1, rumorsMessageID: 0, hasPlayerClicked: false, isHidden: false, resourceSpecific });
@@ -35,14 +36,14 @@ const quest = (uid, questName, displayName, resources) => ({
 
 const delivery = quest(101, 'A0C00Y14', 'The Delivery Boy', [
   person('_questgiver_', 'Gondywyr Hearthhouse', '_questgiver_home_'),
-  place('_questgiver_home_', site(DAGGERFALL, 'Daggerfall', 'The Hearthhouse Residence', 2)),
+  place('_questgiver_home_', site(DAGGERFALL, 'Daggerfall', 'The Yeoming Residence', 2, 328197)),
   person('_pickuplocal_', 'Bedoryan Kingwing', '_pickuplocal_home_'),
-  place('_pickuplocal_home_', site(DAGGERFALL, 'Daggerfall', 'The Wickford Residence', 2)),
+  place('_pickuplocal_home_', site(DAGGERFALL, 'Daggerfall', 'The Wickford Residence', 2, 328965)),
   clock('_oneday_', 1),
 ]);
 const hunt = quest(102, 'M0B00Y00', 'Hunt for a Lycanthrope', [
   person('_questgiver_', 'Lord Kain Mastercroft', '_questgiver_home_'),
-  place('_questgiver_home_', site(DAGGERFALL, 'Daggerfall', 'The Fighters Guild', 2)),
+  place('_questgiver_home_', site(DAGGERFALL, 'Daggerfall', 'The Fighters Guild', 2, 197899)),
   place('_mondung_', site(WICKSTON, 'Ruins of Wickston Manor', null, 1)),
   clock('_1stparton_', 5),
 ]);

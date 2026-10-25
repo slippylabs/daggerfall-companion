@@ -32,6 +32,7 @@ for (const [kind, bytes] of Object.entries(files)) {
   check(dv?.names._pickuplocal_?.[1] === 'Bedoryan Kingwing' && dv?.names._pickuplocal_?.[2] === 'The Wickford Residence' && dv?.names._pickuplocal_?.[3] === 'Daggerfall',
     `[${kind}] the recipient's name, house and town come from the save`);
   check(dv?.locs._pickuplocal_ === idx('Daggerfall') && dv?.daysLeft === 1, `[${kind}] the town by map id, 1 day left`);
+  check(dv?.buildings._pickuplocal_?.key === 328965 && dv?.buildings._questgiver_?.name === 'The Yeoming Residence', `[${kind}] the exact houses by building key`);
   check(whereSaved(saves[0].snap) === idx('Penbrugh'), `[${kind}] saved outdoors at Penbrugh`);
   const old = questsInSave(saves[1].snap, quests).found.find(f => f.q.file === 'M0B00Y00');
   check(old?.locs._mondung_ === idx('Ruins of Wickston Manor') && old?.daysLeft === 5 && old?.names._questgiver_?.[1] === 'Lord Kain Mastercroft',
