@@ -359,3 +359,16 @@ code { color: var(--gold); }
 .dg-sync-status.dg-live { border-color: rgba(159, 227, 154, 0.5); }
 .dg-fresh { box-shadow: 0 0 0 3px var(--gold), inset 0 0 24px rgba(90, 50, 15, 0.35), 0 4px 12px rgba(0, 0, 0, 0.55); }
 .dg-route-line { margin-top: 4px; }
+/* walkthrough follows the game */
+.dg-walk-where { margin: 4px 0 8px; padding: 6px 10px; border-left: 4px solid var(--gold); background: rgba(0, 0, 0, 0.25); color: var(--gold); font-family: var(--caps); font-size: 0.85rem; letter-spacing: 0.04em; }
+.dg-steps-tracked { list-style: none; padding-left: 4px; }
+.dg-st { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 4px 6px; border-radius: 3px; }
+.dg-st-mark { flex: none; width: 1.2em; text-align: center; font-weight: 700; }
+.dg-st-done { opacity: 0.55; }
+.dg-st-done .dg-st-mark { color: #9fe39a; }
+.dg-st-now { background: rgba(242, 205, 82, 0.14); outline: 1px solid var(--gold-dim); }
+.dg-st-now .dg-st-mark { color: var(--gold); }
+.dg-st-info { opacity: 0.8; padding-left: calc(1.2em + 14px); }
+.dg-st-tag { margin-left: 4px; }
+.dg-stepchip { min-height: 40px; padding: 0 10px; border: 1px solid var(--ink-soft); background: rgba(255, 245, 215, 0.35); color: var(--ink); font-family: var(--caps); font-size: 0.7rem; letter-spacing: 0.05em; cursor: pointer; border-radius: 3px; }
+.dg-stepchip:hover { border-color: var(--ink-red); color: var(--ink-red); }

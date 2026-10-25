@@ -10,6 +10,7 @@ globalThis.fetch = async () => { throw new Error('no fetch in test'); };
 const ver = readFileSync(join(SITE, 'js/saveImport.js'), 'utf8').match(/data\.js(\?v=\d+)/)[1];
 const { data } = await import(`../site/js/data.js${ver}`);
 const { readSaves, questsInSave, whereSaved, saveLabel } = await import('../site/js/saveImport.js');
+const { questProgress } = await import('../site/js/questText.js');
 data.locs = JSON.parse(readFileSync(join(SITE, 'data/locations.json'), 'utf8'));
 data.count = data.locs.name.length;
 const quests = JSON.parse(readFileSync(join(SITE, 'data/quests.json'), 'utf8'));
@@ -46,6 +47,13 @@ for (const [kind, bytes] of Object.entries(files)) {
   const k = old?.guide?.[0];
   check(k?.kind === 'kill' && k.who === 'Werewolf' && k.loc === idx('Ruins of Wickston Manor') && k.spot?.bx === FIXTURE_LAIR.bx && k.spot?.z === FIXTURE_LAIR.z && old.guide[1]?.kind === 'reward',
     `[${kind}] Hunt, beast alive, NOW: kill the ${k?.who} at block ${k?.spot?.bx},${k?.spot?.bz}; THEN ${old?.guide?.[1]?.kind}`);
+  // the walkthrough knows the step: the hunt is on its kill (step 1 of 2), then on the reward (2 of 2)
+  const pOld = questProgress(old.q, old.guide), pNow = questProgress(hn.q, hn.guide), pDv = questProgress(dv.q, dv.guide);
+  const kOld = old.q.steps.findIndex(st => st.k === 'kill'), kRew = old.q.steps.findIndex(st => st.k === 'reward');
+  check(pOld.status[kOld] === 'now' && pOld.status[kRew] === 'next' && pOld.step === 1 && pOld.total === 2,
+    `[${kind}] walkthrough, beast alive: kill = now, reward = next, step ${pOld.step} of ${pOld.total}`);
+  check(pNow.status[kOld] === 'done' && pNow.status[kRew] === 'now' && pNow.step === 2, `[${kind}] walkthrough, beast slain: kill done, reward now, step ${pNow.step} of ${pNow.total}`);
+  check(pDv.status[dv.q.steps.findIndex(st => st.k === 'bring')] === 'now' && pDv.total === 1, `[${kind}] Delivery Boy: the delivery (with its click and payment) is the one step, now`);
   const spot = old?.spots?._mondung_?.[0];
   check(old?.spots?._mondung_?.length === 1 && spot.what[0] === '_werewolf_', `[${kind}] the werewolf's spot inside the dungeon`);
 }

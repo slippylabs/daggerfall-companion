@@ -265,6 +265,19 @@ def run(base, width, height, mobile):
         check('Kill the Werewolf' in hn and 'Ruins of Wickston Manor' in hn and 'then:' in ht.lower() and 'Collect your reward' in ht,
               f'[{tag}] Hunt (beast alive): NOW kill the Werewolf in Ruins of Wickston Manor, THEN the reward')
         check(page.locator('#mine-list .dg-mine-now').count() == 2, f'[{tag}] loading again refreshes, never doubles')
+        # the walkthrough follows the game: the card says the step, the walkthrough marks it
+        chip = hunt.locator('.dg-stepchip')
+        check(chip.count() == 1 and 'step 1 of 2' in chip.inner_text().lower(), f'[{tag}] quest card shows the step it is on ({chip.inner_text() if chip.count() else "none"})')
+        chip.click()
+        page.wait_for_selector('#quest-detail .dg-st-now')
+        now_step = page.inner_text('#quest-detail .dg-st-now')
+        check('Kill' in now_step and 'step 1 of 2' in page.inner_text('#quest-detail .dg-walk-where'),
+              f'[{tag}] walkthrough marks the step you are on ({now_step.splitlines()[0][:60]})')
+        check(page.locator('#quest-detail .dg-st-next').count() >= 1, f'[{tag}] walkthrough marks the next step')
+        page.screenshot(path=str(SHOTS / f'walkstep_{tag}.png'), full_page=True)
+        page.click('.hud-tab[data-tab="mine"]')
+        page.wait_for_selector('#mine-list .dg-mine-now')
+        hunt = page.locator('#mine-list .dg-mine-now:has-text("Hunt for a Lycanthrope")')
         hunt.locator('.dg-go-dungeon').click()
         page.wait_for_selector('#dungeon-view .dg-town-mark')
         spot = page.inner_text('#dungeon-view .dg-town-mark')

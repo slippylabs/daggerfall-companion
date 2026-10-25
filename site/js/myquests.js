@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=14';
-import { el, fill } from './ui.js?v=14';
-import { state, onChange, showOnMap, setHere } from './state.js?v=14';
-import { rewardGivers, nameFor, stepText } from './questText.js?v=14';
-import { showQuest } from './quests.js?v=14';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=14';
-import { planRoute } from './route.js?v=14';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=14';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=15';
+import { el, fill } from './ui.js?v=15';
+import { state, onChange, showOnMap, setHere } from './state.js?v=15';
+import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=15';
+import { showQuest } from './quests.js?v=15';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=15';
+import { planRoute } from './route.js?v=15';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=15';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -222,9 +222,11 @@ function thenLine(o, q) {
 function nowCard(q, entry) {
   const g = entry.guide;
   const remove = () => { list = list.filter(e => e !== entry); save(); render(); };
+  const pr = questProgress(q, g);
   const head = el('div', { class: 'dg-card-head dg-now-head' },
     el('span', { class: 'dg-card-name', text: q.title || q.file }),
     el('span', { class: 'dg-now-side' },
+      pr.total > 1 && !pr.finished ? el('button', { class: 'dg-stepchip', title: 'Open the walkthrough at this step', onclick: () => showQuest(q, entry.names, entry.days, g) }, `step ${pr.step} of ${pr.total}`) : null,
       el('span', { class: 'dg-tag' + (entry.daysLeft != null && entry.daysLeft <= 2 ? ' dg-tag-warn' : ''), text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'}` : 'no limit' }),
       el('button', { class: 'dg-done', title: 'Done: remove this quest', 'aria-label': 'Done, remove this quest', onclick: remove }, '✓')));
   const body = !g.length
@@ -264,7 +266,7 @@ function legacyParts(q, entry) {
     inTown(q, entry),
     el('div', { class: 'dg-card-actions' },
       el('label', { class: 'dg-days-label' }, 'Game days left ', left),
-      el('button', { class: 'tool-btn', onclick: () => showQuest(q, entry.names, entry.days) }, 'Walkthrough')),
+      el('button', { class: 'tool-btn', onclick: () => showQuest(q, entry.names, entry.days, entry.guide || null) }, 'Walkthrough')),
   ];
 }
 function legacyCard(q, entry) {

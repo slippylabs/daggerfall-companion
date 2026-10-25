@@ -79,3 +79,43 @@ export function rewardGivers(q, names) {
     building: names?.[f.sym]?.[2] || null,
   }));
 }
+
+// Where a player is in a quest's walkthrough: each step of q.steps as 'done' | 'now' | 'next' | 'todo' | 'info',
+// from the open objectives a save gave (saveImport.guideFor, first = NOW). A step that does something and is not
+// among the open objectives is behind the player (or a branch the quest did not take); facts ("X is at Y") are info.
+const ACTS = new Set(['talk', 'bring', 'kill', 'pickup', 'go', 'reward']);
+function matches(st, o) {
+  const s = o.syms || {}, a = st.a || [];
+  switch (o.kind) {
+    case 'talk': return st.k === 'talk' && a.includes(s.npc);
+    case 'reward': return st.k === 'reward' || (st.k === 'talk' && a.includes(s.npc));
+    // a delivery is the click on the recipient too, and the reward when the recipient pays
+    case 'bring': return (st.k === 'bring' && (a.includes(s.item) || st.b === s.npc)) || (st.k === 'talk' && a.includes(s.npc)) || (o.payer && st.k === 'reward');
+    case 'kill': return st.k === 'kill' && a.includes(s.foe);
+    case 'pickup': return st.k === 'pickup' && a.includes(s.item);
+    case 'go': return st.k === 'go' && a.includes(s.place);
+    default: return false;
+  }
+}
+export function questProgress(q, guide) {
+  const status = q.steps.map(st => (ACTS.has(st.k) ? 'done' : 'info'));
+  (guide || []).forEach((o, gi) => {
+    q.steps.forEach((st, i) => {
+      if (status[i] === 'info' || !matches(st, o)) return;
+      const want = gi === 0 ? 'now' : gi === 1 ? 'next' : 'todo';
+      const rank = { done: 0, todo: 1, next: 2, now: 3 };
+      if (rank[want] > rank[status[i]]) status[i] = want;
+    });
+  });
+  // the count: one per thing to do (a delivery and its click and its payment are one), in the walkthrough's order
+  const acts = status.map((s, i) => [s, i]).filter(([s]) => s !== 'info');
+  const groups = [];
+  for (const [s, i] of acts) {
+    const st = q.steps[i];
+    const prev = groups[groups.length - 1];
+    if (prev && prev.s === s && s !== 'done') { prev.n.push(i); continue; }
+    groups.push({ s, n: [i], k: st.k });
+  }
+  const total = groups.length, at = groups.findIndex(g => g.s === 'now');
+  return { status, total, step: at >= 0 ? at + 1 : total, finished: !guide || !guide.length };
+}

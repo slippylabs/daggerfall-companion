@@ -3,8 +3,8 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=14';
-import { questNow } from './questNow.js?v=14';
+import { data } from './data.js?v=15';
+import { questNow } from './questNow.js?v=15';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -125,7 +125,9 @@ export function guideFor(sq, snap, extra = {}) {
     return { who: p.displayName || null, ...where };
   };
   return objectives.map(o => {
-    const base = { kind: o.kind, later: !!o.later, payer: !!o.payer, answer: o.answer || null, injure: !!o.injure, count: o.count || 1, automatic: !!o.automatic };
+    const base = { kind: o.kind, later: !!o.later, payer: !!o.payer, answer: o.answer || null, injure: !!o.injure, count: o.count || 1, automatic: !!o.automatic,
+      // the quest's own symbols, so the walkthrough's steps can be matched to where the player is
+      syms: { npc: o.npc || null, foe: o.foe || null, item: o.item || null, place: o.place || null } };
     const item = o.item ? itemName(res.get(o.item), extra.names) : null;
     switch (o.kind) {
       case 'talk': case 'reward': return { ...base, ...(o.npc ? person(o.npc, o.place) : {}) };

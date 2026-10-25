@@ -1,8 +1,8 @@
 // Quests tab: every quest script as a walkthrough - what it asks, the time limit, and who pays.
-import { loadQuests, normalise } from './data.js?v=14';
-import { el, fill } from './ui.js?v=14';
-import { templateSegments, stepText, rewardGivers } from './questText.js?v=14';
-import { trackQuest, isTracked } from './myquests.js?v=14';
+import { loadQuests, normalise } from './data.js?v=15';
+import { el, fill } from './ui.js?v=15';
+import { templateSegments, stepText, rewardGivers, questProgress } from './questText.js?v=15';
+import { trackQuest, isTracked } from './myquests.js?v=15';
 
 const $ = id => document.getElementById(id);
 let quests = null, selected = null, tabs = null;
@@ -64,15 +64,19 @@ function templatePara(x, parts, names, days) {
     seg.kind === 'plain' ? seg.text : el('span', { class: seg.kind === 'filled' ? 'dg-chip dg-chip-filled' : 'dg-chip', text: seg.text })));
 }
 
-// Opens a quest; names/days come from a recognised journal entry (journal.js)
-export async function showQuest(x, names = null, days = null) {
+// Opens a quest; names/days come from a recognised journal entry (journal.js) or a save; guide is the save's open
+// objectives (saveImport.guideFor), which mark the step the player is on
+export async function showQuest(x, names = null, days = null, guide = null) {
   tabs?.show('quests');
   await initQuests();
   $('quest-search').value = x.title || x.file;
-  show(x, names, days);
+  show(x, names, days, guide);
 }
 
-function show(x, names = null, days = null) {
+const MARK = { done: '✓', now: '▶', next: '›', todo: '·' };
+const MARK_WORD = { done: 'done', now: 'you are here', next: 'next', todo: 'later' };
+
+function show(x, names = null, days = null, guide = null) {
   selected = x;
   renderList();
   const r = x.reward;
@@ -82,6 +86,7 @@ function show(x, names = null, days = null) {
     : givers.map(g => g.name
       ? g.name + (g.town ? ` (in ${g.town})` : '')
       : g.questor ? 'the quest giver (go back to whoever gave you the quest)' : g.role).join(', or ');
+  const progress = guide ? questProgress(x, guide) : null;
   const log = x.templates.filter(t => t.kind === 'log' && t.v === 0);
   const offer = x.templates.find(t => t.kind === 'offer' && t.v === 0);
   const complete = x.templates.find(t => t.kind === 'complete' && t.v === 0);
@@ -106,7 +111,16 @@ function show(x, names = null, days = null) {
       r.from.some(f => !f.questor) ? el('div', { class: 'dg-card-note', text: 'Not the person who gave you the quest — find this one.' }) : null),
 
     x.steps.length ? el('h3', { text: 'What to do' }) : null,
-    x.steps.length ? el('ol', { class: 'dg-steps' }, x.steps.map(st => el('li', { text: stepText(x, st, names) }))) : null,
+    progress ? el('div', { class: 'dg-walk-where' }, progress.finished
+      ? 'From your game: every step is done; collect anything left and the quest ends.'
+      : `From your game: you are on step ${progress.step} of ${progress.total}.`) : null,
+    x.steps.length ? el('ol', { class: 'dg-steps' + (progress ? ' dg-steps-tracked' : '') }, x.steps.map((st, i) => {
+      const s = progress?.status[i];
+      return el('li', { class: s ? `dg-st dg-st-${s}` : '' },
+        s && s !== 'info' ? el('span', { class: 'dg-st-mark', title: MARK_WORD[s], text: MARK[s] }) : null,
+        stepText(x, st, names),
+        s === 'now' ? el('span', { class: 'dg-tag dg-tag-warn dg-st-tag', text: 'you are here' }) : s === 'next' ? el('span', { class: 'dg-tag dg-st-tag', text: 'next' }) : null);
+    })) : null,
 
     log.length ? el('h3', { text: names ? 'Your journal' : 'Your journal will say' }) : null,
     ...log.map(t => templatePara(x, t.parts, names, days)),
