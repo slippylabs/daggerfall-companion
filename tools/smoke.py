@@ -75,6 +75,7 @@ def run(base, width, height, mobile):
         check('5 days' in panel and 'On foot' in panel and 'On horseback' in panel, f'[{tag}] deadline check: 5 days vs the trip on foot and by horse')
         page.screenshot(path=str(SHOTS / f'journal_{tag}.png'), full_page=True)
 
+        page.click('#journal-out .dg-quest-match .dg-save')
         page.fill('#journal-input', DELIVERY)
         page.click('#journal-find')
         page.wait_for_selector('#journal-out .dg-quest-match')
@@ -83,6 +84,7 @@ def run(base, width, height, mobile):
         check('Bedoryan Kingwing in Daggerfall' in panel and 'Not the person who gave you the quest' in panel,
               f'[{tag}] claim reward from Bedoryan Kingwing (the recipient), by name')
         check('Gondywyr Hearthhouse' in panel and 'pays your reward' in panel, f"[{tag}] who's who lists both people and marks the payer")
+        page.click('#journal-out .dg-quest-match .dg-save')
         page.click('#journal-out .dg-quest-match >> text=Full walkthrough')
         page.wait_for_function('!document.querySelector("#tab-quests").hidden && document.querySelector("#quest-detail .dg-chip-filled")')
         check('Bring' in page.inner_text('#quest-detail .dg-steps') and 'Bedoryan Kingwing' in page.inner_text('#quest-detail .dg-steps'),
@@ -137,12 +139,26 @@ def run(base, width, height, mobile):
         check('The Mages Guild' in page.inner_text('#town-buildings'), f'[{tag}] building search finds The Mages Guild')
         page.screenshot(path=str(SHOTS / f'towns_{tag}.png'), full_page=True)
 
+        # My quests: both saved quests, with who pays and the trips
+        page.click('.hud-tab[data-tab="mine"]')
+        page.wait_for_selector('#mine-list .dg-mine')
+        mine = page.inner_text('#mine-list')
+        check(page.locator('#mine-list .dg-mine').count() == 2, f'[{tag}] My quests holds the two saved quests')
+        check('Bedoryan Kingwing in Daggerfall' in mine, f'[{tag}] My quests: claim reward from Bedoryan Kingwing in Daggerfall')
+        check('Ruins of Wickston Manor' in mine and 'longer than the time left' in mine,
+              f'[{tag}] My quests: the Lycanthrope trip is flagged as longer than the 5 days left')
+        check('my quests (2)' in page.inner_text('.hud-tab[data-tab="mine"]').lower(), f'[{tag}] tab shows the count')
+        page.screenshot(path=str(SHOTS / f'mine_{tag}.png'), full_page=True)
+        page.click('#mine-list .dg-mine >> nth=0 >> text=Done — remove')
+        page.wait_for_timeout(300)
+        check(page.locator('#mine-list .dg-mine').count() == 1, f'[{tag}] Done removes a quest')
+
         # Layout: no sideways scroll, and at phone width every control is thumb-sized
         overflow = page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
         check(overflow <= 0, f'[{tag}] no horizontal overflow ({overflow}px)')
         if mobile:
             small = []
-            for t in ['journal', 'map', 'quests', 'towns']:
+            for t in ['journal', 'map', 'quests', 'towns', 'mine']:
                 page.click(f'.hud-tab[data-tab="{t}"]')
                 page.wait_for_timeout(300)
                 small += page.evaluate('''() => [...document.querySelectorAll('button, select, input, a, summary')]

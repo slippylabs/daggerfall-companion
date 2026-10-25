@@ -218,3 +218,9 @@ code { color: var(--gold); }
   .nav-links { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
   .nav-links .logout-link { font-size: 0.66rem; }
 }
+/* My quests */
+.dg-trips { margin: 8px 0 0; padding-left: 18px; line-height: 1.7; color: var(--ink); }
+.dg-days-label { display: inline-flex; align-items: center; gap: 6px; font-family: var(--caps); font-size: 0.75rem; color: var(--ink-soft); }
+.dg-days { width: 74px; text-align: center; color: var(--ink); background: #e7d4a8; border: 2px solid var(--ink-soft); font-family: var(--serif); font-size: 1rem; padding: 6px; }
+.tool-btn:disabled { opacity: 0.7; cursor: default; }
+.dg-trips .dg-link { min-width: 44px; text-align: center; }

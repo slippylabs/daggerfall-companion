@@ -1,7 +1,8 @@
 // Quests tab: every quest script as a walkthrough - what it asks, the time limit, and who pays.
-import { loadQuests, normalise } from './data.js?v=3';
-import { el, fill } from './ui.js?v=3';
-import { templateSegments, stepText, rewardGivers } from './questText.js?v=3';
+import { loadQuests, normalise } from './data.js?v=4';
+import { el, fill } from './ui.js?v=4';
+import { templateSegments, stepText, rewardGivers } from './questText.js?v=4';
+import { trackQuest, isTracked } from './myquests.js?v=4';
 
 const $ = id => document.getElementById(id);
 let quests = null, selected = null, tabs = null;
@@ -85,7 +86,12 @@ function show(x, names = null, days = null) {
   const offer = x.templates.find(t => t.kind === 'offer' && t.v === 0);
   const complete = x.templates.find(t => t.kind === 'complete' && t.v === 0);
   fill($('quest-detail'),
-    el('h2', { class: 'dg-quest-title', text: x.title || x.file }),
+    el('div', { class: 'dg-card-head' },
+      el('h2', { class: 'dg-quest-title', text: x.title || x.file }),
+      el('button', {
+        class: 'tool-btn', disabled: isTracked(x, names || {}),
+        onclick: e => { trackQuest(x, names || {}, days || {}); e.target.textContent = 'Tracking ✓'; e.target.disabled = true; },
+      }, isTracked(x, names || {}) ? 'Tracking ✓' : 'Track')),
     names ? el('p', { class: 'dg-filled-note', text: 'Filled in from your journal: the underlined blue words are your quest\'s real names.' }) : null,
     el('div', { class: 'dg-quest-facts' },
       x.list ? el('span', { class: 'dg-tag', text: `${guildName(x.list.group)} · ${memberWord(x.list)}` }) : null,

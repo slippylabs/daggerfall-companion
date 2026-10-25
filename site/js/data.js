@@ -1,5 +1,5 @@
 // Loads the built game data and answers lookups: locations, regions, travel between two places.
-import { calculateTravelTime, calculateTripCost, travelDays, walkTravelPath } from './vendor/travelCore.js?v=3';
+import { calculateTravelTime, calculateTripCost, travelDays, walkTravelPath } from './vendor/travelCore.js?v=4';
 
 export const V = '2';
 const get = (path, kind = 'json') => fetch(`${path}?v=${V}`).then(r => {
@@ -118,4 +118,24 @@ export function formatDuration(minutes) {
   if (d && h) return `${d} day${d === 1 ? '' : 's'} ${h} h`;
   if (d) return `${d} day${d === 1 ? '' : 's'}`;
   return `${Math.max(1, h)} h`;
+}
+
+// Locations called exactly this (ignoring case and a leading "The"), nearest first:
+// the player's region, then the shortest trip from where they are
+let byName = null;
+export function locationsNamed(name, here = -1, opts = null) {
+  if (!byName) {
+    byName = new Map();
+    for (let i = 0; i < data.count; i++) {
+      const k = data.norm[i].replace(/^the /, '');
+      if (!byName.has(k)) byName.set(k, []);
+      byName.get(k).push(i);
+    }
+  }
+  const hits = byName.get(normalise(name || '').replace(/^the /, '')) || [];
+  if (here < 0) return hits;
+  const region = data.locs.region[here];
+  return [...hits].sort((a, b) =>
+    ((data.locs.region[b] === region) - (data.locs.region[a] === region)) ||
+    (opts ? travelBetween(here, a, opts).minutes - travelBetween(here, b, opts).minutes : 0));
 }

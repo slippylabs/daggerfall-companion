@@ -1,12 +1,13 @@
 // Journal tab: paste quest text, find every town/dungeon and building it names.
-import { data, normalise, regionName, loadTowns, travelBetween } from './data.js?v=3';
-import { el, fill, locationCard } from './ui.js?v=3';
-import { state, showOnMap } from './state.js?v=3';
-import { openTown } from './towns.js?v=3';
-import { recognise } from './recognise.js?v=3';
-import { showQuest } from './quests.js?v=3';
-import { stepText, rewardGivers, nameFor } from './questText.js?v=3';
-import { formatDuration } from './data.js?v=3';
+import { data, normalise, regionName, loadTowns, travelBetween } from './data.js?v=4';
+import { el, fill, locationCard } from './ui.js?v=4';
+import { state, showOnMap } from './state.js?v=4';
+import { openTown } from './towns.js?v=4';
+import { recognise } from './recognise.js?v=4';
+import { showQuest } from './quests.js?v=4';
+import { trackQuest, isTracked } from './myquests.js?v=4';
+import { stepText, rewardGivers, nameFor } from './questText.js?v=4';
+import { formatDuration } from './data.js?v=4';
 
 const $ = id => document.getElementById(id);
 let nameIndex = null, regionIndex = null;
@@ -212,7 +213,13 @@ function questCard(m) {
     el('div', { class: 'dg-reward-label', text: partial ? 'Probably this quest' : 'Quest recognised' }),
     el('div', { class: 'dg-card-head' },
       el('span', { class: 'dg-card-name', text: q.title || q.file }),
-      el('button', { class: 'tool-btn', onclick: () => showQuest(q, names, days) }, 'Full walkthrough')),
+      el('span', { class: 'dg-card-actions' },
+        el('button', { class: 'tool-btn', onclick: () => showQuest(q, names, days) }, 'Full walkthrough'),
+        partial ? null : el('button', {
+          class: 'tool-btn dg-save',
+          onclick: e => { trackQuest(q, names, days); e.target.textContent = 'Saved ✓'; e.target.disabled = true; },
+          disabled: isTracked(q, names),
+        }, isTracked(q, names) ? 'Saved ✓' : 'Save to My quests'))),
     partial ? el('div', { class: 'dg-card-note', text: 'The wording is close but not exact, so names could not be read. Paste the whole entry to fill them in.' }) : null,
     m.others.length ? el('div', { class: 'dg-dim', text: `Same wording also used by: ${m.others.map(o => o.title || o.file).join(', ')}` }) : null,
 

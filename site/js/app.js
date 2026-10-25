@@ -1,14 +1,15 @@
 // Entry point: load the data, wire the shared "I am in" header and the tabs.
-import { data, loadCore, regionName, typeWord } from './data.js?v=3';
-import { state, setHere, setOpts, onChange, registerTabs } from './state.js?v=3';
-import { autocomplete } from './ui.js?v=3';
-import { initMap } from './map.js?v=3';
-import { initJournal } from './journal.js?v=3';
-import { initQuests, setQuestTabs } from './quests.js?v=3';
-import { initTowns, townsShown } from './towns.js?v=3';
+import { data, loadCore, regionName, typeWord } from './data.js?v=4';
+import { state, setHere, setOpts, onChange, registerTabs } from './state.js?v=4';
+import { autocomplete } from './ui.js?v=4';
+import { initMap } from './map.js?v=4';
+import { initJournal } from './journal.js?v=4';
+import { initQuests, setQuestTabs } from './quests.js?v=4';
+import { initTowns, townsShown } from './towns.js?v=4';
+import { initMyQuests, renderMine } from './myquests.js?v=4';
 
 const $ = id => document.getElementById(id);
-const TABS = ['journal', 'map', 'quests', 'towns'];
+const TABS = ['journal', 'map', 'quests', 'towns', 'mine'];
 const started = new Set();
 
 function show(tab) {
@@ -27,6 +28,7 @@ function show(tab) {
     if (tab === 'quests') initQuests();
   }
   if (tab === 'towns') townsShown();
+  if (tab === 'mine') renderMine();
 }
 
 function renderHere() {
@@ -47,6 +49,7 @@ async function main() {
   setQuestTabs(api);
   initJournal();
   initTowns(api);
+  initMyQuests(api);
 
   autocomplete($('here-input'), $('here-list'), { onPick: i => setHere(i) });
   for (const [id, key] of [['opt-transport', 'transport'], ['opt-pace', 'pace'], ['opt-sleep', 'sleep']]) {

@@ -2,7 +2,7 @@
 // names, places and days the game filled into its blanks. Each quest message is a template of fixed
 // text and typed blanks (tools/build-quests.mjs); a template becomes a regular expression and the
 // blanks become capture groups.
-import { loadQuests } from './data.js?v=3';
+import { loadQuests } from './data.js?v=4';
 
 const MIN_LITERAL = 24;
 // A Daggerfall date ("Morndas, 4th of Morning Star, 3E 405"), else any short run of text
