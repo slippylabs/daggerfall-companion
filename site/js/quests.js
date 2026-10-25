@@ -1,9 +1,10 @@
 // Quests tab: every quest script as a walkthrough - what it asks, the time limit, and who pays.
-import { loadQuests, normalise } from './data.js?v=1';
-import { el, fill } from './ui.js?v=1';
+import { loadQuests, normalise } from './data.js?v=2';
+import { el, fill } from './ui.js?v=2';
+import { templateSegments, stepText, rewardGivers } from './questText.js?v=2';
 
 const $ = id => document.getElementById(id);
-let quests = null, selected = null;
+let quests = null, selected = null, tabs = null;
 
 const GUILDS = {
   FightersGuild: 'Fighters Guild', MagesGuild: 'Mages Guild', ThievesGuild: 'Thieves Guild', DarkBrotherHood: 'Dark Brotherhood',
@@ -25,7 +26,12 @@ function memberWord(l) {
   return MEMBER[l.member] || l.member;
 }
 
-export async function initQuests() {
+export function setQuestTabs(api) { tabs = api; }
+
+let starting = null;
+export function initQuests() { return (starting ||= start()); }
+
+async function start() {
   quests = (await loadQuests()).filter(q => !/^_|^S000/.test(q.file) || q.title);
   quests.sort((a, b) => (a.title || '~' + a.file).localeCompare(b.title || '~' + b.file));
   const groups = [...new Set(quests.map(q => q.list?.group).filter(Boolean))].sort((a, b) => guildName(a).localeCompare(guildName(b)));
@@ -50,31 +56,41 @@ function renderList() {
   if (list.length === 1 && list[0] !== selected) show(list[0]);
 }
 
-// Journal text marks the parts the game fills in per quest as {braces}: show them as chips
-function journalText(text) {
-  const parts = [];
-  let last = 0;
-  for (const m of text.matchAll(/\{([^}]*)\}/g)) {
-    parts.push(text.slice(last, m.index), el('span', { class: 'dg-chip', text: m[1] }));
-    last = m.index + m[0].length;
-  }
-  parts.push(text.slice(last));
-  return el('p', { class: 'dg-journal' }, ...parts);
+// A template as a paragraph: blanks the game fills in are chips (orange), or the player's own
+// names when a journal entry was recognised (green)
+function templatePara(x, parts, names, days) {
+  return el('p', { class: 'dg-journal' }, templateSegments(x, parts, names, days).map(seg =>
+    seg.kind === 'plain' ? seg.text : el('span', { class: seg.kind === 'filled' ? 'dg-chip dg-chip-filled' : 'dg-chip', text: seg.text })));
 }
 
-function show(x) {
+// Opens a quest; names/days come from a recognised journal entry (journal.js)
+export async function showQuest(x, names = null, days = null) {
+  tabs?.show('quests');
+  await initQuests();
+  $('quest-search').value = x.title || x.file;
+  show(x, names, days);
+}
+
+function show(x, names = null, days = null) {
   selected = x;
   renderList();
   const r = x.reward;
+  const givers = rewardGivers(x, names);
   const who = r.automatic
     ? 'Nobody to visit: it is given the moment the job is done.'
-    : r.from.map(f => f.questor ? 'the quest giver (go back to whoever gave you the quest)' : f.role).join(', or ');
-  fill($('quest-detail'), 
+    : givers.map(g => g.name
+      ? g.name + (g.town ? ` (in ${g.town})` : '')
+      : g.questor ? 'the quest giver (go back to whoever gave you the quest)' : g.role).join(', or ');
+  const log = x.templates.filter(t => t.kind === 'log' && t.v === 0);
+  const offer = x.templates.find(t => t.kind === 'offer' && t.v === 0);
+  const complete = x.templates.find(t => t.kind === 'complete' && t.v === 0);
+  fill($('quest-detail'),
     el('h2', { class: 'dg-quest-title', text: x.title || x.file }),
+    names ? el('p', { class: 'dg-filled-note', text: 'Filled in from your journal: green words are your quest\'s real names.' }) : null,
     el('div', { class: 'dg-quest-facts' },
       x.list ? el('span', { class: 'dg-tag', text: `${guildName(x.list.group)} · ${memberWord(x.list)}` }) : null,
       x.list?.minReq ? el('span', { class: 'dg-tag', text: x.list.minReq < 10 ? `rank ${x.list.minReq}+` : `reputation ${x.list.minReq}+` }) : null,
-      x.timeLimit ? el('span', { class: 'dg-tag dg-tag-warn', text: `Time limit: ${x.timeLimit}` }) : null,
+      x.timeLimit ? el('span', { class: 'dg-tag dg-tag-warn', text: `Time limit: ${days?.[x.timer] ? days[x.timer] + ' days' : x.timeLimit}` }) : null,
       el('span', { class: 'dg-tag dg-dim', text: x.file })),
 
     el('div', { class: 'dg-reward' + (r.from.some(f => !f.questor) ? ' dg-reward-other' : '') },
@@ -84,13 +100,13 @@ function show(x) {
       r.from.some(f => !f.questor) ? el('div', { class: 'dg-card-note', text: 'Not the person who gave you the quest — find this one.' }) : null),
 
     x.steps.length ? el('h3', { text: 'What to do' }) : null,
-    x.steps.length ? el('ol', { class: 'dg-steps' }, x.steps.map(s => el('li', { text: s }))) : null,
+    x.steps.length ? el('ol', { class: 'dg-steps' }, x.steps.map(st => el('li', { text: stepText(x, st, names) }))) : null,
 
-    x.journal.length ? el('h3', { text: 'Your journal will say' }) : null,
-    ...x.journal.map(journalText),
-    x.journal.length ? el('p', { class: 'tool-note', text: 'Highlighted parts are filled in by the game for your quest: paste the real entry into the Journal tab to find those places.' }) : null,
+    log.length ? el('h3', { text: names ? 'Your journal' : 'Your journal will say' }) : null,
+    ...log.map(t => templatePara(x, t.parts, names, days)),
+    log.length && !names ? el('p', { class: 'tool-note', text: 'Highlighted parts are filled in by the game for your quest: paste your real entry into the Journal tab and the guide fills them in.' }) : null,
 
-    x.offer ? el('details', {}, el('summary', { text: 'What the quest giver says' }), journalText(x.offer)) : null,
-    x.complete ? el('details', {}, el('summary', { text: 'When you finish' }), journalText(x.complete)) : null);
+    offer ? el('details', {}, el('summary', { text: 'What the quest giver says' }), templatePara(x, offer.parts, names, days)) : null,
+    complete ? el('details', {}, el('summary', { text: 'When you finish' }), templatePara(x, complete.parts, names, days)) : null);
   if (matchMedia('(max-width: 760px)').matches) $('quest-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }

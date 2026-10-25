@@ -1,6 +1,6 @@
 // Small DOM helpers shared by the tabs: element builder, autocomplete box, location cards.
-import { data, regionName, typeWord, dungeonWord, bearing, travelBetween, formatDuration, searchLocations } from './data.js?v=1';
-import { state, setHere, showOnMap } from './state.js?v=1';
+import { data, regionName, typeWord, dungeonWord, bearing, travelBetween, formatDuration, searchLocations } from './data.js?v=2';
+import { state, setHere, showOnMap } from './state.js?v=2';
 
 export function el(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag);

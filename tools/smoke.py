@@ -21,6 +21,9 @@ JOURNAL = ("The Fighters Guild of Daggerfall has hired me to kill a troublesome 
            "Gondywyr Hearthhouse of Daggerfall has charged me with delivering a package to Bedoryan Kingwing at "
            "The Wickford Residence. I should also visit The Convocation of Elona.")
 
+DELIVERY = ("Morndas, 4th of Morning Star, 3E 405: Gondywyr Hearthhouse of Daggerfall has charged me with the task of "
+            "delivering a package to Bedoryan Kingwing, also of Daggerfall. I have to have it there by this time tomorrow.")
+
 results = []
 
 
@@ -66,7 +69,29 @@ def run(base, width, height, mobile):
             check(want in names, f'[{tag}] journal finds "{want}"')
         trip = page.inner_text('#journal-out')
         check('day' in trip and 'km' in trip, f'[{tag}] journal cards show travel time and distance from Daggerfall')
+        # The quest is recognised from its journal wording, with the blanks read back
+        panel = page.inner_text('#journal-out .dg-quest-match')
+        check('Hunt for a Lycanthrope' in panel, f'[{tag}] journal entry recognised as Hunt for a Lycanthrope')
+        check('5 days' in panel and 'On foot' in panel and 'On horseback' in panel, f'[{tag}] deadline check: 5 days vs the trip on foot and by horse')
         page.screenshot(path=str(SHOTS / f'journal_{tag}.png'), full_page=True)
+
+        page.fill('#journal-input', DELIVERY)
+        page.click('#journal-find')
+        page.wait_for_selector('#journal-out .dg-quest-match')
+        panel = page.inner_text('#journal-out .dg-quest-match')
+        check('The Delivery Boy' in panel, f'[{tag}] delivery entry recognised as The Delivery Boy')
+        check('Bedoryan Kingwing in Daggerfall' in panel and 'Not the person who gave you the quest' in panel,
+              f'[{tag}] claim reward from Bedoryan Kingwing (the recipient), by name')
+        check('Gondywyr Hearthhouse' in panel and 'pays your reward' in panel, f"[{tag}] who's who lists both people and marks the payer")
+        page.click('#journal-out .dg-quest-match >> text=Full walkthrough')
+        page.wait_for_function('!document.querySelector("#tab-quests").hidden && document.querySelector("#quest-detail .dg-chip-filled")')
+        check('Bring' in page.inner_text('#quest-detail .dg-steps') and 'Bedoryan Kingwing' in page.inner_text('#quest-detail .dg-steps'),
+              f'[{tag}] walkthrough steps use the real names')
+        page.screenshot(path=str(SHOTS / f'walkthrough_{tag}.png'), full_page=True)
+        page.click('.hud-tab[data-tab="journal"]')
+        page.fill('#journal-input', JOURNAL)
+        page.click('#journal-find')
+        page.wait_for_selector('#journal-out .dg-card')
 
         # Show on map from the journal
         page.click('#journal-out .dg-card:has-text("Ruins of Wickston Manor") >> text=Show on map')
@@ -95,7 +120,7 @@ def run(base, width, height, mobile):
         page.fill('#quest-search', 'Delivery Boy')
         page.wait_for_selector('#quest-detail .dg-reward')
         reward = page.inner_text('#quest-detail .dg-reward')
-        check('townsperson' in reward and 'Not the person who gave you the quest' in reward,
+        check(('townsperson' in reward or 'Bedoryan Kingwing' in reward) and 'Not the person who gave you the quest' in reward,
               f'[{tag}] The Delivery Boy: claim reward from the recipient')
         page.fill('#quest-search', 'Hunt for a Lycanthrope')
         page.wait_for_function('document.querySelector("#quest-detail h2")?.textContent === "Hunt for a Lycanthrope"')

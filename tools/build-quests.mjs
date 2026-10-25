@@ -127,19 +127,19 @@ function parseQuest(text, file) {
   const qbnAt = lines.findIndex(l => /^QBN:/.test(l));
 
   // Messages: "QuestLogEntry:  [1010]" or "Message:  1011"
+  // Messages: "QuestLogEntry:  [1010]" or "Message:  1011"; alternative wordings split by <--->
   const messages = {};
   let cur = null;
   for (const l of lines.slice(qrcAt + 1, qbnAt)) {
     const m = l.match(/^(\w+):\s*\[?(\d+)\]?\s*$/);
-    if (m) { cur = { kind: m[1], id: +m[2], lines: [] }; messages[cur.id] = cur; continue; }
-    if (cur && l.trim() !== '<--->') cur.lines.push(l.replace(/<ce>/g, '').trim());
+    if (m) { cur = { kind: m[1], id: +m[2], variants: [[]] }; messages[cur.id] = cur; continue; }
+    if (!cur) continue;
+    if (l.trim() === '<--->') cur.variants.push([]);
+    else if (/^\s*--/.test(l)) continue;   // a script comment, not message text
+    else cur.variants[cur.variants.length - 1].push(l.replace(/<ce>/g, '').trim());
   }
-  const msgText = id => {
-    const m = messages[id];
-    if (!m) return null;
-    // the first variant only (variants are split by <--->)
-    return m.lines.join(' ').replace(/\s+/g, ' ').trim();
-  };
+  const variantsOf = id => (messages[id]?.variants ?? [])
+    .map(v => v.join(' ').replace(/\s*-moved line.*$/, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
 
   // QBN: resources and tasks
   const resources = {};
@@ -164,26 +164,28 @@ function parseQuest(text, file) {
   }
   const role = sym => (res[sym] ? res[sym].role : words(sym));
 
-  // Journal text with the script's placeholders turned into {braced} phrases the page highlights:
-  // _x_ a thing or person, __x_ / ___x_ where it is, =x_ a timer's days, %qdt the date, %g pronouns
-  const readable = text => {
-    if (!text) return text;
-    return text
-      .replace(/%qdt:?\s*/g, '')
-      .replace(/(^|[^_\w])___(\w+?_)(?!\w)/g, (_, a, sym) => `${a}{${where('_' + sym)}}`)
-      .replace(/(^|[^_\w])__(\w+?_)(?!\w)/g, (_, a, sym) => `${a}{${where('_' + sym)}}`)
-      .replace(/(^|[^_\w])(_\w+?_)(?!\w)/g, (_, a, sym) => `${a}{${res[sym] ? res[sym].role : words(sym)}}`)
-      .replace(/=(\w+?_)(?!\w)/g, (_, sym) => `{${res['_' + sym] ? res['_' + sym].role : 'a few'}}`)
-      .replace(/%g3\b/g, 'their').replace(/%g2\b/g, 'them').replace(/%g1?\b/g, 'they')
-      .replace(/%\w+/g, '…')
-      .replace(/\s*-moved line.*$/, '');
-  };
-  const where = sym => {
-    const r = res[sym];
-    if (!r) return 'somewhere';
-    if (r.kind === 'Place') return r.role + (r.where ? ' ' + r.where : '');
-    if (r.questor) return "the quest giver's town";
-    return `where ${r.role.replace(/,.*$/, '')} lives`;
+  // A message as a template: literal text plus typed blanks the game fills in.
+  //   {s: sym, n: 1..4}  _x_ name, __x_ building, ___x_ town, ____x_ region (person or place)
+  //   {c: sym}           =x_  a timer's days        {m: 'g2'}  a %macro (date, pronoun, player...)
+  const template = text => {
+    const parts = [];
+    const re = /(?<![\w])(_{1,4})([A-Za-z0-9.]+?_)(?![\w])|=([A-Za-z0-9.]+?_)(?![\w])|%([a-z][a-z0-9]*)/g;
+    let last = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > last) parts.push(text.slice(last, m.index));
+      if (m[2]) {
+        const sym = '_' + m[2];
+        parts.push(res[sym] ? { s: sym, n: m[1].length } : m[0]);
+      } else if (m[3]) {
+        // =x_ is a timer's days for a Clock; for anything else it names the thing (=monster_)
+        const sym = '_' + m[3];
+        parts.push(!res[sym] ? m[0] : res[sym].kind === 'Clock' ? { c: sym } : { s: sym, n: 1 });
+      }
+      else parts.push({ m: m[4] });
+      last = re.lastIndex;
+    }
+    if (last < text.length) parts.push(text.slice(last));
+    return parts;
   };
 
   // ---- Reward giver: the NPC clicked in (or waited on by) the task that runs "give pc" ----
@@ -215,47 +217,49 @@ function parseQuest(text, file) {
   let rewardFrom = [...givers].filter(s => res[s] && res[s].kind === 'Person');
   if (rewardFrom.some(s => res[s].questor)) rewardFrom = rewardFrom.filter(s => res[s].questor);
 
-  // ---- Steps in plain English: where things are, what to do, then the reward ----
-  // Each step is a template with one variable part; random alternatives ("pick one of") merge
-  const order = { at: 0, map: 1, given: 2, do: 3, reward: 4 };
+  // ---- Steps: where things are, what to do, then the reward ----
+  // Each step is {k: kind, a: [syms], b: sym}; random alternatives ("pick one of") merge into a
+  const order = { at_npc: 0, at_item: 0, at_foe: 0, map: 1, given: 2, kill: 3, pickup: 3, bring: 3, talk: 3, go: 3, reward: 4 };
   const stepMap = new Map();
-  const add = (cat, pre, obj, post = '') => {
-    const key = cat + '|' + pre + '|' + post;
-    if (!stepMap.has(key)) stepMap.set(key, { cat, pre, post, objs: [] });
+  const add = (k, a, b = null) => {
+    const key = k + '|' + (b || '');
+    if (!stepMap.has(key)) stepMap.set(key, { k, a: [], b });
     const st = stepMap.get(key);
-    if (!st.objs.includes(obj)) st.objs.push(obj);
+    if (!st.a.includes(a)) st.a.push(a);
   };
-  let timeLimit = null;
+  let timeLimit = null, timer = null;
   for (const t of tasks) {
     for (const l of t.lines) {
       let m;
-      if ((m = l.match(/^start timer (_\S+_)/)) && res[m[1]]) timeLimit = timeLimit || res[m[1]].role;
-      else if ((m = l.match(/^place npc (_\S+_) at (_\S+_)/))) add('at', '', role(m[1]), ` is at ${role(m[2])}`);
-      else if ((m = l.match(/^place item (_\S+_) at (_\S+_)/))) add('at', '', role(m[1]), ` is hidden at ${role(m[2])}`);
-      else if ((m = l.match(/^place foe (_\S+_) at (_\S+_)/))) add('at', '', role(m[1]), ` waits at ${role(m[2])}`);
-      else if ((m = l.match(/^reveal (_\S+_)/))) add('map', '', role(m[1]), ' is marked on your map');
-      else if ((m = l.match(/^get item (_\S+_)/))) add('given', 'You are given ', role(m[1]));
-      else if ((m = l.match(/^killed (\d+ )?(_\S+_)/))) add('do', 'Kill ', role(m[2]));
-      else if ((m = l.match(/^clicked item (_\S+_)/))) add('do', 'Pick up ', role(m[1]));
-      else if ((m = l.match(/^toting (_\S+_) and (_\S+_) clicked/))) add('do', 'Bring ', role(m[1]), ` to ${role(m[2])}`);
-      else if ((m = l.match(/^clicked npc (_\S+_)/)) && !res[m[1]]?.questor) add('do', 'Talk to ', role(m[1]));
-      else if ((m = l.match(/^pc at (_\S+_)/))) add('do', 'Go to ', role(m[1]));
-      else if ((m = l.match(/^give pc (_\S+_)/)) && res[m[1]]) add('reward', 'Reward: ', role(m[1]));
+      if ((m = l.match(/^start timer (_\S+_)/)) && res[m[1]]) { timer = timer || m[1]; timeLimit = timeLimit || res[m[1]].role; }
+      else if ((m = l.match(/^place npc (_\S+_) at (_\S+_)/))) add('at_npc', m[1], m[2]);
+      else if ((m = l.match(/^place item (_\S+_) at (_\S+_)/))) add('at_item', m[1], m[2]);
+      else if ((m = l.match(/^place foe (_\S+_) at (_\S+_)/))) add('at_foe', m[1], m[2]);
+      else if ((m = l.match(/^reveal (_\S+_)/))) add('map', m[1]);
+      else if ((m = l.match(/^get item (_\S+_)/))) add('given', m[1]);
+      else if ((m = l.match(/^killed (\d+ )?(_\S+_)/))) add('kill', m[2]);
+      else if ((m = l.match(/^clicked item (_\S+_)/))) add('pickup', m[1]);
+      else if ((m = l.match(/^toting (_\S+_) and (_\S+_) clicked/))) add('bring', m[1], m[2]);
+      else if ((m = l.match(/^clicked npc (_\S+_)/)) && !res[m[1]]?.questor) add('talk', m[1]);
+      else if ((m = l.match(/^pc at (_\S+_)/))) add('go', m[1]);
+      else if ((m = l.match(/^give pc (_\S+_)/)) && res[m[1]]) add('reward', m[1]);
     }
   }
-  const list = objs => objs.length === 1 ? objs[0] : objs.slice(0, -1).join(', ') + ' or ' + objs[objs.length - 1];
-  const steps = [...stepMap.values()].sort((a, b) => order[a.cat] - order[b.cat]).map(st => {
-    // placements and gifts come from "pick one of"; several kill/talk targets may all be needed
-    const obj = st.objs.length < 2 ? st.objs[0] : (st.cat === 'at' || st.cat === 'given') ? `one of: ${list(st.objs)}` : st.objs.join(' / ');
-    const text = st.pre ? st.pre + obj + st.post : cap(obj) + st.post;
-    return text + '.';
-  });
+  const steps = [...stepMap.values()].filter(st => st.a.every(x => res[x]) && (!st.b || res[st.b]))
+    .sort((a, b) => order[a.k] - order[b.k]);
 
   // Journal entries: QuestLogEntry plus every message the script logs
   const logIds = new Set();
   for (const t of tasks) for (const l of t.lines) { const m = l.match(/^log (\d+)/); if (m) logIds.add(+m[1]); }
   for (const [id, m] of Object.entries(messages)) if (m.kind === 'QuestLogEntry') logIds.add(+id);
-  const journal = [...logIds].sort((a, b) => a - b).map(id => readable(msgText(id))).filter(Boolean);
+  const templates = [];
+  const addTemplates = (ids, kind) => {
+    for (const id of ids) variantsOf(id).forEach((text, v) => templates.push({ id, kind, v, parts: template(text) }));
+  };
+  addTemplates([...logIds].sort((a, b) => a - b), 'log');
+  addTemplates([1000], 'offer');
+  addTemplates([1002], 'accept');
+  addTemplates([1004], 'complete');
 
   const name = header.quest || file.replace(/\.txt$/i, '');
   return {
@@ -266,9 +270,8 @@ function parseQuest(text, file) {
     questee: header.questee || null,
     list: membership[name.toUpperCase()] || null,
     timeLimit,
-    offer: readable(msgText(1000)),
-    complete: readable(msgText(1004)),
-    journal,
+    timer,
+    templates,
     steps,
     reward: {
       automatic: rewardFrom.length === 0,
@@ -279,8 +282,6 @@ function parseQuest(text, file) {
     resources: res,
   };
 }
-
-function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 const files = readdirSync(join(QDIR, 'Quests')).filter(f => f.toLowerCase().endsWith('.txt')).sort();
 const quests = [];

@@ -1569,3 +1569,16 @@ mark.regex-match { background: rgba(57, 255, 143, 0.3); color: var(--hud-green);
   .dg-quest-detail summary, .dg-alts summary { min-height: 44px; }
   .dg-map-zoom { margin-left: 0; }
 }
+
+/* Recognised quest (journal tab) */
+.dg-quest-match { border: 2px solid var(--hud-green); background: rgba(57, 255, 143, 0.05); }
+.dg-quest-match h3 { color: var(--hud-green); font-size: 0.88rem; margin: 14px 0 6px; }
+.dg-quest-match .dg-card-head { margin: 4px 0 6px; }
+.dg-cast { margin: 0; padding-left: 18px; line-height: 1.7; font-size: 0.9rem; }
+.dg-cast .dg-tag { margin-left: 8px; }
+.dg-tag-good { border-color: var(--hud-green); color: var(--hud-green); }
+.dg-deadline { margin-top: 12px; border: 1px dashed var(--panel-border); padding: 10px 12px; font-size: 0.88rem; }
+.dg-deadline ul { margin: 6px 0; padding-left: 18px; line-height: 1.6; }
+.dg-bad { color: var(--hud-red); }
+.dg-chip-filled { color: var(--hud-green); border-bottom-color: var(--hud-green); font-weight: bold; }
+.dg-filled-note { color: var(--hud-green); font-size: 0.82rem; margin: 0 0 8px; }

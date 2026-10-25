@@ -8,4 +8,5 @@ node tools/build-images.mjs
 node tools/build-towns.mjs
 node tools/build-quests.mjs
 node tools/verify.mjs
+node tools/test-recognise.mjs
 find site/data -type f \( -name '*.json' -o -name '*.bin' \) -exec gzip -9 -kf {} \;

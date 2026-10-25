@@ -1,8 +1,12 @@
 // Journal tab: paste quest text, find every town/dungeon and building it names.
-import { data, normalise, regionName, loadTowns, travelBetween } from './data.js?v=1';
-import { el, fill, locationCard } from './ui.js?v=1';
-import { state, showOnMap } from './state.js?v=1';
-import { openTown } from './towns.js?v=1';
+import { data, normalise, regionName, loadTowns, travelBetween } from './data.js?v=2';
+import { el, fill, locationCard } from './ui.js?v=2';
+import { state, showOnMap } from './state.js?v=2';
+import { openTown } from './towns.js?v=2';
+import { recognise } from './recognise.js?v=2';
+import { showQuest } from './quests.js?v=2';
+import { stepText, rewardGivers, nameFor } from './questText.js?v=2';
+import { formatDuration } from './data.js?v=2';
 
 const $ = id => document.getElementById(id);
 let nameIndex = null, regionIndex = null;
@@ -108,10 +112,14 @@ async function run() {
     }
   }
 
-  fill(out, 
+  const match = await recognise(text);
+  const questPanel = match ? questCard(match) : null;
+
+  fill(out,
+    questPanel,
     el('p', { class: 'tool-note' }, found.length
       ? `Found ${found.length} place${found.length === 1 ? '' : 's'}${regionsNamed.size ? ` (region named: ${[...regionsNamed].map(regionName).join(', ')})` : ''}.`
-      : 'No town, dungeon or building names found. Names of people are made up for each quest, so they cannot be looked up; try the Quests tab with the quest\'s title.'),
+      : match ? 'No town, dungeon or building names in it.' : 'No town, dungeon or building names found, and the text did not match a quest. Try the Quests tab with the quest\'s title.'),
     pins.length > 1 ? el('button', { class: 'tool-btn', onclick: () => showOnMap(pins[0], pins) }, 'Show all on the map') : null,
     ...cards);
 }
@@ -160,3 +168,73 @@ const FRIENDLY = {
   GuildHall: 'Guild hall', PawnShop: 'Pawn shop', WeaponSmith: 'Weapon smith', Temple: 'Temple', Tavern: 'Tavern', Palace: 'Palace',
 };
 export const friendlyType = t => FRIENDLY[t] || (t ? t.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\d+$/, '') : 'Building');
+
+
+// ---- the recognised quest ----
+
+// The location a recognised place blank names, if it is a known town or dungeon
+function locationFor(q, sym, names) {
+  const n = names[sym];
+  if (!n) return -1;
+  for (const v of [n[3], n[2], n[1]]) {
+    if (!v) continue;
+    const hits = nameIndex.get(normalise(v).replace(/^the /, ''));
+    if (hits?.length) return rank(hits, new Set())[0];
+  }
+  return -1;
+}
+
+function questCard(m) {
+  const { quest: q, names, days, partial } = m;
+  const givers = rewardGivers(q, names);
+  const people = Object.keys(q.resources).filter(sym => q.resources[sym].kind === 'Person' && names[sym]?.[1]);
+  const payers = new Set(q.reward.from.map(f => f.sym));
+
+  // Deadline: the quest timer's days against the trip to the quest's main place
+  const timerDays = +(days[q.timer] || Object.entries(days).find(([s]) => q.resources[s]?.kind === 'Clock')?.[1] || 0);
+  const places = Object.keys(q.resources).filter(sym => q.resources[sym].kind === 'Place');
+  const target = places.map(sym => ({ sym, loc: locationFor(q, sym, names) })).filter(p => p.loc >= 0)
+    .sort((a, b) => (q.resources[b.sym].scope === 'remote') - (q.resources[a.sym].scope === 'remote'))[0];
+  let deadline = null;
+  if (timerDays && target && state.here >= 0 && target.loc !== state.here) {
+    const trip = t => travelBetween(state.here, target.loc, { ...state.opts, transport: t }).minutes;
+    const foot = trip('foot'), horse = trip('horse'), limit = timerDays * 1440;
+    const verdict = mins => mins * 2 <= limit ? 'dg-good' : mins <= limit ? 'dg-warn' : 'dg-bad';
+    deadline = el('div', { class: 'dg-deadline' },
+      el('div', {}, el('b', { class: 'dg-num', text: `${timerDays} days` }), ` to finish (counted from when you took the quest). To ${data.locs.name[target.loc]}:`),
+      el('ul', {},
+        el('li', { class: verdict(foot) }, `On foot: ${formatDuration(foot)} each way`),
+        el('li', { class: verdict(horse) }, `On horseback: ${formatDuration(horse)} each way`)),
+      el('div', { class: 'dg-dim', text: 'Green: there and back in time. Orange: you can get there, not back. Red: too slow.' }));
+  }
+
+  return el('div', { class: 'dg-card dg-quest-match' },
+    el('div', { class: 'dg-reward-label', text: partial ? 'Probably this quest' : 'Quest recognised' }),
+    el('div', { class: 'dg-card-head' },
+      el('span', { class: 'dg-card-name', text: q.title || q.file }),
+      el('button', { class: 'tool-btn', onclick: () => showQuest(q, names, days) }, 'Full walkthrough')),
+    partial ? el('div', { class: 'dg-card-note', text: 'The wording is close but not exact, so names could not be read. Paste the whole entry to fill them in.' }) : null,
+    m.others.length ? el('div', { class: 'dg-dim', text: `Same wording also used by: ${m.others.map(o => o.title || o.file).join(', ')}` }) : null,
+
+    el('div', { class: 'dg-reward' + (q.reward.from.some(f => !f.questor) ? ' dg-reward-other' : '') },
+      el('div', { class: 'dg-reward-label', text: q.reward.automatic ? 'Reward' : 'Claim reward from' }),
+      el('div', { class: 'dg-reward-who', text: q.reward.automatic ? 'Given the moment the job is done — nobody to visit.'
+        : givers.map(g => (g.name || (g.questor ? 'the quest giver' : g.role)) + (g.town ? ` in ${g.town}` : '')).join(', or ') }),
+      q.reward.from.some(f => !f.questor) ? el('div', { class: 'dg-card-note', text: 'Not the person who gave you the quest.' }) : null,
+      ...givers.filter(g => g.name && g.town).map(g => {
+        const loc = locationFor(q, g.sym, names);
+        return loc >= 0 && loc !== state.here
+          ? el('button', { class: 'tool-btn', onclick: () => showOnMap(loc) }, `Show ${data.locs.name[loc]} on map`) : null;
+      })),
+
+    people.length ? el('h3', { text: "Who's who" }) : null,
+    people.length ? el('ul', { class: 'dg-cast' }, people.map(sym => el('li', {},
+      el('b', { text: names[sym][1] }), ` — ${q.resources[sym].role}`,
+      names[sym][3] ? ` · in ${names[sym][3]}` : '',
+      payers.has(sym) ? el('span', { class: 'dg-tag dg-tag-good', text: 'pays your reward' }) : null))) : null,
+
+    deadline,
+
+    q.steps.length ? el('h3', { text: 'What to do' }) : null,
+    q.steps.length ? el('ol', { class: 'dg-steps' }, q.steps.map(st => el('li', { text: stepText(q, st, names) }))) : null);
+}
