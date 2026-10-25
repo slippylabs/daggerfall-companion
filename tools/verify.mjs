@@ -56,20 +56,25 @@ for (const name of ['Daggerfall', 'Ruins of Wickston Manor', 'The Fortress of Ma
   check(total === locs.name.length, `location count ${locs.name.length} == MAPS.BSA total ${total}`);
 }
 
-// 4. Building names and keys seen in the real game (Daggerfall Unity test run)
+// 4. Towns as DFO Online lays them out (Beautiful Villages + Beautiful Cities, tools/lib/townPacks.mjs), with the
+// building keys of the in-game test that the layout kept
 {
   const towns = load('data/towns/r17.json');
   const id = locs.name.findIndex((n, k) => n === 'Daggerfall' && locs.region[k] === 17);
   const city = towns.towns[id];
   const all = city.b.length + city.houses.length / 5;
-  check(all === 647, `Daggerfall city has 647 buildings (${all})`);
+  check(all === 566 && city.bn[0] === 'EMTYAA00', `Daggerfall is Beautiful Cities' layout: 566 buildings (${all}), its corner block ${city.bn[0]}`);
   const byKey = k => city.b.find(r => r[8] === k);
   check(byKey(197899)?.[0] === 'The Fighters Guild', 'building 197899 is The Fighters Guild');
-  check(byKey(66048)?.[0] === 'The Mages Guild', 'building 66048 is The Mages Guild');
+  check(byKey(393728)?.[0] === 'The Mages Guild', 'building 393728 is The Mages Guild (moved by Beautiful Cities)');
   // the quest houses of the in-game test (The Yeoming / The Wickford Residence) are houses here, by key
   const houseKeys = new Set(city.houses.filter((_, k) => k % 5 === 4));
   check(houseKeys.has(328197) && houseKeys.has(328965), 'quest houses 328197 and 328965 are Daggerfall houses');
   check(city.b.some(r => r[0] === 'The Bank of the Empire' && r[9] === 'The Bank of Daggerfall'), 'banks use DFO Online naming (Bank of the Empire)');
+  const r32 = load('data/towns/r32.json');
+  const crom = Object.values(r32.towns).find(t => t.name === 'Cromcart');
+  check(crom?.bn.join() === 'FARMAA00,FARMAA03,TVRNAS04,GENRAS04' && crom.b.every(b => b[0]),
+    `Cromcart is Beautiful Villages' layout (${crom?.bn.join()}), no unnamed entries among its named buildings`);
 }
 
 // 4b. Dungeon floors: the game's own entrance and quest markers stand on a floor at their height (98% as built;
@@ -94,8 +99,9 @@ for (const name of ['Daggerfall', 'Ruins of Wickston Manor', 'The Fortress of Ma
   check(n > 400 && ok / n >= 0.95, `dungeon markers stand on mapped floors: ${ok}/${n}`);
 }
 
-// 4c. Town maps: a building's anchor stands on its own automap byte (buildingType + 1) once the block's rows
-// run north-first (93% as built; the unflipped map gives ~42%), which pins the town map's orientation
+// 4c. Town maps: a named building's anchor stands on its own automap byte (buildingType + 1) once the block's
+// rows run north-first (98% with the online layouts; the unflipped map gives far less), which pins the orientation
+// and shows the packs' block pictures agree with their buildings
 {
   const cache = {};
   const am = n => (n in cache ? cache[n] : (cache[n] = (() => { try { return readFileSync(join(SITE, `data/rmb/${n}.bin`)); } catch { return null; } })()));
@@ -118,7 +124,7 @@ for (const name of ['Daggerfall', 'Ruins of Wickston Manor', 'The Fortress of Ma
       }
     }
   }
-  check(n > 5000 && ok / n >= 0.9, `buildings stand on their own colour on the town maps: ${ok}/${n}`);
+  check(n > 5000 && ok / n >= 0.95, `buildings stand on their own colour on the town maps: ${ok}/${n}`);
 }
 
 // 5. Map dots: every dot sits on its location's pixel by the game's own law

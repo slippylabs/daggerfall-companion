@@ -6,6 +6,7 @@ globalThis.location = { search: '?online=1' };
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { dfo, arena2, loadMaps, writeOut, SITE, ROOT } from './lib/env.mjs';
+import { openTownPacks } from './lib/townPacks.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
 const { BlocksFile } = await dfo('src/formats/blocksFile.js');
@@ -16,9 +17,12 @@ const { FactionFile, FACTION_TYPES } = await dfo('src/formats/factionFile.js');
 const { findFactions } = await dfo('src/systems/talk/talk.js');
 const { getNameBankOfRegion } = await dfo('src/characters/nameHelper.js');
 
-const maps = await loadMaps();
 const blocks = new BlocksFile();
 blocks.load(arena2('BLOCKS.BSA'));
+// the towns as DFO Online lays them out (Beautiful Villages + Beautiful Cities), before any location is read
+const packs = await openTownPacks(blocks);
+console.log('town packs:', Object.entries(packs).map(([v, p]) => `${v} ${p.version} (${p.files} files)`).join(', '));
+const maps = await loadMaps();
 const factions = new FactionFile();
 factions.load(arena2('FACTION.TXT'));
 
@@ -87,10 +91,11 @@ for (let r = 0; r < maps.regionCount; r++) {
     // quest site in a save names: DFO place.js makeBuildingKey(blockX, blockY, record))
     const houses = [];
     for (const b of list) {
-      if (b.isResidence && !b.name)
+      // (an unnamed record that is no residence - Beautiful Villages' farm fields - is no named building either)
+      if (!b.name)
         houses.push(b.blockX, b.blockY, Math.round(b.position[0]), Math.round(b.position[2]), b.buildingKey);
     }
-    const rows = list.filter(b => !(b.isResidence && !b.name)).map(b => {
+    const rows = list.filter(b => b.name).map(b => {
       const row = [b.name, b.buildingType, b.factionId, b.quality, b.blockX, b.blockY,
         Math.round(b.position[0] * 10) / 10, Math.round(b.position[2] * 10) / 10, b.buildingKey];
       if (b.buildingType === BUILDING_TYPES.Bank) {

@@ -1,9 +1,9 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=12';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=12';
-import { state } from './state.js?v=12';
-import { showDungeon, dungeonBlocks } from './dungeon.js?v=12';
-import { townMap } from './townmap.js?v=12';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=13';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=13';
+import { state } from './state.js?v=13';
+import { showDungeon, dungeonBlocks } from './dungeon.js?v=13';
+import { townMap } from './townmap.js?v=13';
 
 const $ = id => document.getElementById(id);
 const BLOCK = 102.4;   // one RMB block is 4096 Daggerfall units = 102.4 m
@@ -144,7 +144,7 @@ async function drawMap() {
   const { town, file } = current;
   map ||= townMap($('town-map'), { colours: TOWN_COLOURS, groupOfByte: GROUP_OF_BYTE,
     onPick: name => { highlight = name; mark = null; renderList(); drawMap(); } });
-  const named = town.b.map(b => ({ name: b[0], bx: b[4], by: b[5], x: b[6], z: b[7], type: file.buildingTypes[b[1]] }));
+  const named = town.b.map(b => ({ name: b[0], bx: b[4], by: b[5], x: b[6], z: b[7], type: file.buildingTypes[b[1]], byte: b[1] + 1 }));
   const sel = mark || (highlight && named.find(b => b.name === highlight)) || null;
   await map.show(town, named, sel ? { ...sel, name: sel.name, quest: !!mark } : null, data.locs.name[current.i]);
 }

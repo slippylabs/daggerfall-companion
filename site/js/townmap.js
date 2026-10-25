@@ -3,11 +3,11 @@
 // other byte a building of type byte-1. Blocks go north row first (as DFO exteriorAutomapWindow.js lays them),
 // so the image is the town north-up, 64 pixels a block. A building's anchor is
 // (bx*64 + x/102.4*64, h*64-1 - (by*64 + z/102.4*64)); its footprint is the patch of its byte around that.
-import { el, fill } from './ui.js?v=12';
+import { el, fill } from './ui.js?v=13';
 
 const PX = 64, BLOCK = 102.4;
 const blocks = {};
-const blockBytes = name => (blocks[name] ||= fetch(`data/rmb/${name}.bin?v=1`)
+const blockBytes = name => (blocks[name] ||= fetch(`data/rmb/${name}.bin?v=2`)
   .then(r => (r.ok ? r.arrayBuffer() : null)).then(b => (b ? new Uint8Array(b) : null)).catch(() => null));
 const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
 
@@ -30,15 +30,20 @@ export function townMap(box, { colours, groupOfByte, onPick }) {
   const anchor = b => [b.bx * PX + Math.trunc(b.x / BLOCK * PX), H - 1 - (b.by * PX + Math.trunc(b.z / BLOCK * PX))];
   const byteAt = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? -1 : bytes[y * W + x]);
 
-  // the building's footprint: its byte's connected patch around the anchor (the anchor may sit just outside)
+  // the building's footprint: its byte's connected patch around the anchor. The anchor may sit just outside, or
+  // in a courtyard, so its own byte (type + 1) is looked for first, nearest out, then any building byte
   function footprint(b) {
     const [ax, ay] = anchor(b);
     let seed = null;
-    for (let d = 0; d <= 3 && !seed; d++)
-      for (let dy = -d; dy <= d && !seed; dy++) for (let dx = -d; dx <= d && !seed; dx++) {
-        const v = byteAt(ax + dx, ay + dy);
-        if (v > 0 && v !== 0xfb) seed = [ax + dx, ay + dy, v];
-      }
+    const look = (ok, reach) => {
+      for (let d = 0; d <= reach && !seed; d++)
+        for (let dy = -d; dy <= d && !seed; dy++) for (let dx = -d; dx <= d && !seed; dx++) {
+          const v = byteAt(ax + dx, ay + dy);
+          if (ok(v)) seed = [ax + dx, ay + dy, v];
+        }
+    };
+    if (b.byte) look(v => v === b.byte, 6);
+    if (!seed) look(v => v > 0 && v !== 0xfb, 3);
     if (!seed) return null;
     const out = new Set(), stack = [[seed[0], seed[1]]], v = seed[2];
     while (stack.length && out.size < 4000) {

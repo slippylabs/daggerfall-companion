@@ -156,6 +156,12 @@ def run(base, width, height, mobile):
         page.wait_for_timeout(300)
         check('The Mages Guild' in page.inner_text('#town-buildings'), f'[{tag}] building search finds The Mages Guild')
         page.screenshot(path=str(SHOTS / f'towns_{tag}.png'), full_page=True)
+        # a Beautiful Villages town: the layout DFO Online shows, not classic Daggerfall's
+        page.fill('#town-input', 'Cromcart')
+        page.wait_for_selector('#town-suggest li')
+        page.click('#town-suggest li >> nth=0')
+        page.wait_for_function('document.querySelector("#town-buildings")?.innerText.includes("Rusty Badger")')
+        check('5 named buildings and 23 houses' in page.inner_text('#town-buildings'), f'[{tag}] Cromcart has DFO Online\'s layout (5 named, 23 houses)')
         page.fill('#town-input', 'Ruins of Wickston Manor')
         page.wait_for_selector('#town-suggest li')
         page.click('#town-suggest li >> nth=0')

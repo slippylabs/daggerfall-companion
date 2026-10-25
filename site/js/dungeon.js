@@ -1,7 +1,7 @@
 // Dungeon maps: the floors of a dungeon's blocks seen from above (tools/build-dungeons.mjs), the entrance, and,
 // from a save, the exact spot the quest put its person, foe or item. One level at a time or all at once.
-import { data } from './data.js?v=12';
-import { el, fill } from './ui.js?v=12';
+import { data } from './data.js?v=13';
+import { el, fill } from './ui.js?v=13';
 
 const SIDE = 51.2, N = 128, BAND = 3.2;
 const V = '1';

@@ -1,7 +1,7 @@
 // Loads the built game data and answers lookups: locations, regions, travel between two places.
-import { calculateTravelTime, calculateTripCost, travelDays, walkTravelPath } from './vendor/travelCore.js?v=12';
+import { calculateTravelTime, calculateTripCost, travelDays, walkTravelPath } from './vendor/travelCore.js?v=13';
 
-export const V = '4';
+export const V = '5';
 const get = (path, kind = 'json') => fetch(`${path}?v=${V}`).then(r => {
   if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
   return kind === 'json' ? r.json() : r.arrayBuffer();
