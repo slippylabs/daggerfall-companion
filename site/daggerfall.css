@@ -224,3 +224,8 @@ code { color: var(--gold); }
 .dg-days { width: 74px; text-align: center; color: var(--ink); background: #e7d4a8; border: 2px solid var(--ink-soft); font-family: var(--serif); font-size: 1rem; padding: 6px; }
 .tool-btn:disabled { opacity: 0.7; cursor: default; }
 .dg-trips .dg-link { min-width: 44px; text-align: center; }
+.dg-planner { border: 3px double var(--ink-red); }
+.dg-route { margin-top: 8px; }
+.dg-route .dg-steps li { margin-bottom: 4px; }
+.dg-route-total { margin: 8px 0 10px; color: var(--ink); }
+.dg-ink { color: var(--ink) !important; }

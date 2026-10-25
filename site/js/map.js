@@ -1,8 +1,8 @@
 // Map tab: the game's own travel-map art. World view = TRAV0I00 (click a region);
 // region view = its FMAP page(s) with every location dot placed by the game's own law.
-import { data, regionName, typeWord, searchLocations, travelBetween } from './data.js?v=4';
-import { el, fill, autocomplete, locationCard } from './ui.js?v=4';
-import { state, registerMap, onChange } from './state.js?v=4';
+import { data, regionName, typeWord, searchLocations, travelBetween } from './data.js?v=5';
+import { el, fill, autocomplete, locationCard } from './ui.js?v=5';
+import { state, registerMap, onChange } from './state.js?v=5';
 
 const $ = id => document.getElementById(id);
 const canvas = $('map-canvas'), ctx = canvas.getContext('2d');
@@ -10,7 +10,7 @@ const tip = $('map-tip');
 const images = {};
 const img = src => images[src] ||= Object.assign(new Image(), { src: `img/${src}?v=1` });
 
-const view = { mode: 'world', region: -1, page: 0, zoom: 1, ox: 0, oy: 0, selected: -1, pins: [] };
+const view = { mode: 'world', region: -1, page: 0, zoom: 1, ox: 0, oy: 0, selected: -1, pins: [], route: null };
 const LEGEND = [
   ['City / town / village', 11], ['Dungeon', 1], ['Temple / shrine', 8], ['Tavern', 10], ['Farm / manor / cottage', 5], ['Graveyard / coven', 3],
 ];
@@ -131,9 +131,11 @@ function pageFor(i) {
   return null;
 }
 
-function select(i, pins = null) {
+// route: a planned trip [from, stop, stop, ...] drawn leg by leg instead of the single line from "I am in"
+function select(i, pins = null, route = null) {
   view.selected = i;
   view.pins = pins || [];
+  view.route = route;
   const p = pageFor(i);
   if (p) {
     openRegion(data.locs.region[i], p.page);
@@ -214,16 +216,20 @@ function draw() {
   const s = scale();
   ctx.drawImage(image, view.ox, view.oy, 320 * s, 160 * s);
 
-  // route from where the player is, along the pixels the travel law charges (scale-1 pages only)
-  if (state.here >= 0 && view.selected >= 0 && view.selected !== state.here && p.scale === 1) {
-    const path = travelBetween(state.here, view.selected, state.opts).path;
+  // routes follow the pixels the travel law charges (scale-1 pages only): a planned trip leg by leg,
+  // or the single trip from where the player is to the selection
+  if (p.scale === 1) {
+    const legs = view.route ? view.route.slice(1).map((to, k) => [view.route[k], to])
+      : state.here >= 0 && view.selected >= 0 && view.selected !== state.here ? [[state.here, view.selected]] : [];
     ctx.strokeStyle = 'rgba(255,145,48,0.9)';
     ctx.lineWidth = Math.max(2, s * 0.35);
-    ctx.beginPath();
-    const hx = data.locs.px[state.here] - p.origin[0], hy = data.locs.py[state.here] - p.origin[1];
-    ctx.moveTo(view.ox + (hx + 0.5) * s, view.oy + (hy + 0.5) * s);
-    for (const q of path) ctx.lineTo(view.ox + (q.x - p.origin[0] + 0.5) * s, view.oy + (q.y - p.origin[1] + 0.5) * s);
-    ctx.stroke();
+    for (const [from, to] of legs) {
+      const path = travelBetween(from, to, state.opts).path;
+      ctx.beginPath();
+      ctx.moveTo(view.ox + (data.locs.px[from] - p.origin[0] + 0.5) * s, view.oy + (data.locs.py[from] - p.origin[1] + 0.5) * s);
+      for (const q of path) ctx.lineTo(view.ox + (q.x - p.origin[0] + 0.5) * s, view.oy + (q.y - p.origin[1] + 0.5) * s);
+      ctx.stroke();
+    }
   }
 
   const size = Math.max(2 * devicePixelRatio, s * 0.9);
@@ -248,7 +254,7 @@ function draw() {
       ctx.fillText(label, cx + r + 7, cy + 4 * devicePixelRatio);
     }
   };
-  for (const i of view.pins) mark(i, '#ff9130', data.locs.name[i]);
+  view.pins.forEach((i, k) => mark(i, '#ff9130', view.route ? `${k + 1}. ${data.locs.name[i]}` : data.locs.name[i]));
   if (state.here >= 0) mark(state.here, '#5ab8ff', 'You');
   if (view.selected >= 0) mark(view.selected, '#ffffff', data.locs.name[view.selected]);
 }

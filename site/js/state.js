@@ -23,7 +23,7 @@ export function setOpts(o) { Object.assign(state.opts, o); emit('opts'); }
 let mapApi = null, tabApi = null;
 export const registerMap = api => { mapApi = api; };
 export const registerTabs = api => { tabApi = api; };
-export function showOnMap(i, pins = null) {
+export function showOnMap(i, pins = null, route = null) {
   tabApi?.show('map');
-  mapApi?.select(i, pins);
+  mapApi?.select(i, pins, route);
 }

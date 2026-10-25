@@ -148,7 +148,17 @@ def run(base, width, height, mobile):
         check('Ruins of Wickston Manor' in mine and 'longer than the time left' in mine,
               f'[{tag}] My quests: the Lycanthrope trip is flagged as longer than the 5 days left')
         check('my quests (2)' in page.inner_text('.hud-tab[data-tab="mine"]').lower(), f'[{tag}] tab shows the count')
+        plan = page.inner_text('#mine-list .dg-planner')
+        check('Ruins of Wickston Manor' in plan and 'after its days run out' in plan and 'Total:' in plan,
+              f'[{tag}] route planner orders the stops and flags the late dungeon')
         page.screenshot(path=str(SHOTS / f'mine_{tag}.png'), full_page=True)
+        page.click('#mine-list .dg-planner >> text=Show route on map')
+        page.wait_for_function('!document.querySelector("#tab-map").hidden')
+        page.wait_for_timeout(600)
+        check(page.inner_text('#map-title') == 'Daggerfall', f'[{tag}] planned route opens on the map')
+        page.screenshot(path=str(SHOTS / f'route_{tag}.png'), full_page=True)
+        page.click('.hud-tab[data-tab="mine"]')
+        page.wait_for_selector('#mine-list .dg-mine')
         page.click('#mine-list .dg-mine >> nth=0 >> text=Done — remove')
         page.wait_for_timeout(300)
         check(page.locator('#mine-list .dg-mine').count() == 1, f'[{tag}] Done removes a quest')
