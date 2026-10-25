@@ -36,7 +36,7 @@ const task = (sd, s) => sd.tasks.find(t => sym(t.symbol) === s);
 // Start a task: it triggers and its non-condition actions run (pick = which `pick one of` branch, by index)
 export function run(sd, s, pick = 0, force = false) {
   const t = task(sd, s);
-  if (!t || (t.triggered && !force)) return sd;
+  if (!t || t.dropped || (t.triggered && !force)) return sd;
   t.triggered = true;
   for (const a of t.actions || []) {
     if (a.isTriggerCondition) continue;
@@ -46,12 +46,32 @@ export function run(sd, s, pick = 0, force = false) {
     if (a.type === 'StartTask') for (const ts of x.taskSymbols || [x.taskSymbol]) run(sd, sym(ts), pick);
     // the player's quest items (sd._held), as the game's inventory would hold them
     sd._held ||= new Set();
-    if (a.type === 'GetItem') sd._held.add(sym(x.itemSymbol));
+    if (a.type === 'GetItem') { sd._held.add(sym(x.itemSymbol)); haveWatchers(sd, sym(x.itemSymbol), pick); }
     if (a.type === 'TakeItem' || a.type === 'DropAsQuestItem') sd._held.delete(sym(x.itemSymbol));
     if (a.type === 'HaveItem' && sd._held.has(sym(x.targetItem))) run(sd, sym(x.targetTask), pick);
     if (a.type === 'Prompt') run(sd, sym(x.yesTaskSymbol), pick);   // the player answers Yes
+    // the journal, as Quest.addLogStep / removeLogStep keep it: one entry per step, a step logged again replaced in place
+    sd.activeLogMessages ||= [];
+    if (a.type === 'LogMessage') {
+      const e = { stepID: x.stepID, messageID: x.messageID, time: (sd._logClock = (sd._logClock || 0) + 1) }, i = sd.activeLogMessages.findIndex(l => l.stepID === x.stepID);
+      if (i >= 0) sd.activeLogMessages[i] = e; else sd.activeLogMessages.push(e);
+    }
+    // `clear` sets a task back (Task.clear: untriggered, its actions rearmed) so it can happen again; `unset` drops it
+    if (a.type === 'ClearTask' || a.type === 'UnsetTask') for (const ts of x.taskSymbols || []) {
+      const c = task(sd, sym(ts));
+      if (!c) continue;
+      c.triggered = false;
+      for (const ca of c.actions || []) ca.isComplete = false;
+      if (a.type === 'UnsetTask') c.dropped = true;
+    }
+    if (a.type === 'RemoveLogMessage') sd.activeLogMessages = sd.activeLogMessages.filter(l => l.stepID !== x.stepID);
   }
   return sd;
+}
+// `have _item_ set _task_` watches while its task runs: the item in hand starts the task
+function haveWatchers(sd, item, pick = 0) {
+  for (const t of sd.tasks) if (t.triggered) for (const a of t.actions || [])
+    if (a.type === 'HaveItem' && sym(a.actionSpecific?.targetItem) === item) run(sd, sym(a.actionSpecific.targetTask), pick);
 }
 // the player's quest items, in the shape questNow takes from a real save's inventories
 export const heldItems = sd => [...(sd._held || [])].map(s => ({ questUID: sd.uid, symbol: s }));
@@ -74,10 +94,17 @@ export function perform(sd, o) {
       default: return false;
     }
   };
+  if (o.kind === 'wait') run(sd, o.clock);   // the time runs out
   if (o.kind === 'kill' && !o.injure) kill(sd, o.foe, o.count || 1);
   sd._held ||= new Set();
-  if (o.kind === 'pickup') sd._held.add(o.item);
+  if (o.kind === 'pickup') { sd._held.add(o.item); haveWatchers(sd, o.item); }
   if (o.kind === 'drop') sd._held.delete(o.item);
+  // time passes between errands: a `daily from` task is on only in its hours (an always-on trigger, so it switches off
+  // again), and an errand not tied to the hours is done outside them
+  if (!o.hours) for (const t of sd.tasks) if (t.triggered && (t.actions || []).some(a => a.type === 'DailyFrom' && a.isTriggerCondition)) t.triggered = false;
+  // the player comes in the hours a `daily from` watcher keeps
+  if (o.hours) for (const t of sd.tasks) if (!t.triggered && (t.actions || []).some(a => a.type === 'DailyFrom')
+    && (t.actions || []).some(a => a.type === 'PcAt' && sym(a.actionSpecific?.placeSymbol) === o.place)) run(sd, sym(t.symbol));
   const watcher = { go: ['PcAt', 'placeSymbol', o.place], use: ['ItemUsedDo', 'itemSymbol', o.item], cast: ['CastSpellDo', 'spellID', o.spell] }[o.kind];
   if (watcher) for (const t of sd.tasks) for (const a of t.actions || [])
     if (a.type === watcher[0] && sym(a.actionSpecific?.[watcher[1]]) === watcher[2] && t.triggered) run(sd, sym(a.actionSpecific.taskSymbol));
@@ -91,15 +118,17 @@ export function settle(sd) {
     changed = false;
     for (const t of sd.tasks) {
       if (t.triggered) continue;
-      const w = (t.actions || []).find(a => a.isTriggerCondition && a.type === 'WhenTask');
-      if (!w) continue;
-      let v = null;
-      for (const e of w.actionSpecific?.evaluations || []) {
-        const x = !!sd.tasks.find(k => sym(k.symbol) === e.task)?.triggered;
-        const term = /Not$/.test(e.op) ? !x : x;
-        v = v === null ? term : /^and/.test(e.op) ? v && term : /^or/.test(e.op) ? v || term : term;
-      }
-      if (v) { run(sd, sym(t.symbol)); changed = true; }
+      // each `when` line is a trigger of its own: any one that holds starts the task
+      const holds = w => {
+        let v = null;
+        for (const e of w.actionSpecific?.evaluations || []) {
+          const x = !!sd.tasks.find(k => sym(k.symbol) === e.task)?.triggered;
+          const term = /Not$/.test(e.op) ? !x : x;
+          v = v === null ? term : /^and/.test(e.op) ? v && term : /^or/.test(e.op) ? v || term : term;
+        }
+        return !!v;
+      };
+      if (!t.dropped && (t.actions || []).some(a => a.isTriggerCondition && a.type === 'WhenTask' && holds(a))) { run(sd, sym(t.symbol)); changed = true; }
     }
   }
   return sd;

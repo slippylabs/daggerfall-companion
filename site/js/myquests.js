@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=16';
-import { el, fill } from './ui.js?v=16';
-import { state, onChange, showOnMap, setHere } from './state.js?v=16';
-import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=16';
-import { showQuest } from './quests.js?v=16';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=16';
-import { planRoute } from './route.js?v=16';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=16';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=17';
+import { el, fill } from './ui.js?v=17';
+import { state, onChange, showOnMap, setHere } from './state.js?v=17';
+import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=17';
+import { showQuest } from './quests.js?v=17';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=17';
+import { planRoute } from './route.js?v=17';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=17';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -93,7 +93,7 @@ export function applySave(found, character) {
       || list.find(x => x.file === f.q.file && x.uid == null && compatible(x.names, f.names));
     if (e) refreshed++;
     else { e = { file: f.q.file, done: [], jobDone: false, saved: Date.now(), fresh: Date.now() }; list.unshift(e); added++; }
-    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, spots: f.spots, guide: f.guide, uid: f.uid, character, synced: Date.now() });
+    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, spots: f.spots, guide: f.guide, journal: f.journal || [], uid: f.uid, character, synced: Date.now() });
     e.key = f.q.file + '|' + JSON.stringify(f.names);
     seen.add(e);
   }
@@ -178,9 +178,28 @@ function sayAction(o, q) {
     case 'drop': return `Drop ${o.item || 'the quest item'} here (inventory → drop)`;
     case 'use': return `Use ${o.item || 'the quest item'} from your inventory`;
     case 'cast': return `Cast the spell ${o.spell}`;
-    case 'go': return 'Go there';
+    case 'go': return o.hours ? `Go there between ${clockTime(o.hours[0])} and ${clockTime(o.hours[1])} (game time): the quest only watches then` : 'Go there';
+    case 'wait': return `Wait for the time to run out${o.days ? ` (about ${plural(o.days, 'day')})` : ''}: the quest goes on by itself then`;
     default: return '';
   }
+}
+const clockTime = sec => `${String(Math.floor(sec / 3600) % 24).padStart(2, '0')}:${String(Math.floor(sec / 60) % 60).padStart(2, '0')}`;
+// the journal's latest entry (the save's log steps, by the time written)
+const latestJournal = entry => [...(entry.journal || [])].sort((a, b) => b.time - a.time)[0] || null;
+const placeName = p => p.building?.name ? `${p.building.name}, ${data.locs.name[p.loc]}` : data.locs.name[p.loc];
+// the journal's words on a card, two lines until clicked
+function journalLine(j) {
+  return el('div', { class: 'dg-jline', title: 'Your journal in the game (click to read it all)', onclick: e => e.currentTarget.classList.toggle('dg-open') },
+    el('span', { class: 'dg-jline-label', text: 'Journal: ' }), `“${j.text}”`);
+}
+// a place the journal names that NOW does not go to: said, with a way there
+function journalNote(j, o) {
+  const p = j?.lastPlace;
+  if (!p || p.loc == null || !o || o.automatic || !o.syms?.place || o.syms.place === p.sym) return null;
+  const go = p.building
+    ? el('button', { class: 'dg-chip-btn', onclick: () => openTown(p.loc, p.building.name, { key: p.building.key }) }, 'Town')
+    : el('button', { class: 'dg-chip-btn', onclick: () => showOnMap(p.loc, null, state.here >= 0 ? [state.here, p.loc] : null) }, 'World');
+  return el('div', { class: 'dg-jnote' }, 'Your journal mentions ', el('b', { text: placeName(p) }), '. ', go);
 }
 // where, as a signpost: town, building, and the part of town it stands in
 function signpost(o) {
@@ -203,7 +222,7 @@ function nowBlock(o, q) {
     if (o.spot || o.dungeon) buttons.push(el('button', { class: 'dg-chip-btn dg-go-dungeon', onclick: () => openTown(o.loc, null, { targets: o.spot ? [{ ...o.spot, label: cap(o.who || o.item || 'Here') }] : [] }) }, 'Dungeon'));
     if (o.loc !== state.here) buttons.push(el('button', { class: 'dg-chip-btn dg-go-map', onclick: () => showOnMap(o.loc, null, state.here >= 0 ? [state.here, o.loc] : null) }, 'World'));
   }
-  const meta = [sp?.part, o.loc === state.here ? 'you are here' : trip ? `${formatDuration(trip.minutes)} away` : null].filter(Boolean);
+  const meta = [sp?.part, o.loc === state.here ? 'you are here' : trip ? `${formatDuration(trip.minutes)} away` : null, o.fromJournal ? 'the place your journal names' : null].filter(Boolean);
   return el('div', { class: 'dg-step-block dg-step-now' },
     sp ? el('div', { class: 'dg-sign' },
       el('span', { class: 'dg-sign-arrow', text: '▶' }),
@@ -226,16 +245,23 @@ function nowCard(q, entry) {
   const head = el('div', { class: 'dg-card-head dg-now-head' },
     el('span', { class: 'dg-card-name', text: q.title || q.file }),
     el('span', { class: 'dg-now-side' },
-      pr.total > 1 && !pr.finished ? el('button', { class: 'dg-stepchip', title: 'Open the walkthrough at this step', onclick: () => showQuest(q, entry.names, entry.days, g) }, `step ${pr.step} of ${pr.total}`) : null,
+      pr.total > 1 && !pr.finished ? el('button', { class: 'dg-stepchip', title: 'Open the walkthrough at this step', onclick: () => showQuest(q, entry.names, entry.days, g, entry.journal) }, `step ${pr.step} of ${pr.total}`) : null,
       el('span', { class: 'dg-tag' + (entry.daysLeft != null && entry.daysLeft <= 2 ? ' dg-tag-warn' : ''), text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'}` : 'no limit' }),
       el('button', { class: 'dg-done', title: 'Done: remove this quest', 'aria-label': 'Done, remove this quest', onclick: remove }, '✓')));
+  const j = latestJournal(entry), jp = j?.lastPlace;
+  // nothing the script points to: the place the journal names, else the journal's own words
   const body = !g.length
-    ? el('div', { class: 'dg-step-block dg-step-now' }, el('div', { class: 'dg-step-what', text: 'Nothing the guide can point to. Check the quest in your journal, or open details.' }))
-    : [nowBlock(g[0], q), g[1] ? thenLine(g[1], q) : null];
+    ? (jp?.loc != null
+      ? nowBlock({ kind: 'go', loc: jp.loc, building: jp.building ? { key: jp.building.key, name: jp.building.name } : null, fromJournal: true }, q)
+      : el('div', { class: 'dg-step-block dg-step-now' }, el('div', { class: 'dg-step-what', text: j ? 'Nothing the guide can point to: follow your journal.' : 'Nothing the guide can point to. Check the quest in your journal, or open details.' })))
+    : [nowBlock(g[0], q), journalNote(j, g[0]), g[1] ? thenLine(g[1], q) : null];
+  const older = (entry.journal || []).filter(e => e !== j);
   // a quest that just arrived from the game glows for a couple of minutes
   const fresh = entry.fresh && Date.now() - entry.fresh < 120000 && list.length > 1;
-  return el('div', { class: 'dg-card dg-mine dg-mine-now' + (fresh ? ' dg-fresh' : '') }, head, body,
-    el('details', { class: 'dg-more' }, el('summary', { text: 'details' }), ...legacyParts(q, entry)));
+  return el('div', { class: 'dg-card dg-mine dg-mine-now' + (fresh ? ' dg-fresh' : '') }, head, body, j ? journalLine(j) : null,
+    el('details', { class: 'dg-more' }, el('summary', { text: 'details' }),
+      older.length ? el('div', { class: 'dg-jolder' }, el('b', { text: 'Earlier in your journal' }), ...older.map(e => el('p', { text: `“${e.text}”` }))) : null,
+      ...legacyParts(q, entry)));
 }
 
 // ---- quests added from the journal or the Quests tab (no save): the full card ----
@@ -266,7 +292,7 @@ function legacyParts(q, entry) {
     inTown(q, entry),
     el('div', { class: 'dg-card-actions' },
       el('label', { class: 'dg-days-label' }, 'Game days left ', left),
-      el('button', { class: 'tool-btn', onclick: () => showQuest(q, entry.names, entry.days, entry.guide || null) }, 'Walkthrough')),
+      el('button', { class: 'tool-btn', onclick: () => showQuest(q, entry.names, entry.days, entry.guide || null, entry.journal || null) }, 'Walkthrough')),
   ];
 }
 function legacyCard(q, entry) {

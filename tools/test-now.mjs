@@ -2,15 +2,16 @@
 // must give questNow() a first objective with a real target; and two quests played stage by stage must
 // give the objectives a player sees in the game.
 import { compile, start, run, setTriggered, kill, questFiles, perform, settle, heldItems } from './lib/questSim.mjs';
-import { questNow } from '../site/js/questNow.js';
+import { questNow, journalPlace } from '../site/js/questNow.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SITE } from './lib/env.mjs';
 
 let pass = 0, fail = 0;
+const JOURNAL_AGREE = 0.88;   // 180/200 in v2.5.0; the rest are multi-stop quests (bricks in three places) where NOW is the right stop
 const check = (ok, what) => { ok ? pass++ : fail++; console.log(`${ok ? 'PASS' : 'FAIL'} ${what}`); };
 const now = sd => questNow(sd, heldItems(sd)).objectives;
-const show = o => o ? `${o.kind} ${o.npc || o.foe || o.item || o.place || (o.automatic ? '(automatic)' : '')}` : 'nothing';
+const show = o => o ? `${o.kind} ${o.npc || o.foe || o.item || o.place || o.clock || (o.automatic ? '(automatic)' : '')}` : 'nothing';
 
 // Sweep: the quests a player can get (the guide's own list: no demo scripts, no untitled story helpers)
 const listed = new Set(JSON.parse(readFileSync(join(SITE, 'data/quests.json'), 'utf8'))
@@ -23,7 +24,7 @@ for (const f of files) {
   compiled++;
   start(sd);
   const o = now(sd)[0];
-  if (!o || !(o.npc || o.foe || o.item || o.place || o.automatic)) bad.push(`${f} ${sd.displayName || ''}: ${show(o)}`);
+  if (!o || !(o.npc || o.foe || o.item || o.place || o.clock || o.automatic)) bad.push(`${f} ${sd.displayName || ''}: ${show(o)}`);
 }
 if (process.argv.includes('-v')) bad.forEach(b => console.log('   ', b));
 check((compiled - bad.length) / compiled >= 0.95, `startup NOW with a target for ${compiled - bad.length}/${compiled} quests`);
@@ -32,6 +33,7 @@ check((compiled - bad.length) / compiled >= 0.95, `startup NOW with a target for
 {
   const stuck = [];
   let ok = 0, n = 0;
+  var jt = { named: 0, agree: 0, list: [] };
   for (const f of files) {
     const sd = compile(f);
     if (!sd) continue;
@@ -46,13 +48,24 @@ check((compiled - bad.length) / compiled >= 0.95, `startup NOW with a target for
       const o = r.objectives[0];
       if (!o || o.automatic) break;
       last = show(o);
+      // NOW against the journal: does the guide send the player where the journal does?
+      // (a person met at home, or the quest giver to report back to, has no place; the journal may still name the
+      // job's dungeon then, which is no disagreement)
+      const j = journalPlace(sd), personal = ['talk', 'reward', 'bring'].includes(o.kind) && !o.place;
+      if (j && !personal) {
+        jt.named++;
+        if (o.place === j) jt.agree++;
+        else jt.list.push(`${f} step ${steps}: NOW ${show(o)} at ${o.place || '(no place)'}, journal names ${j}`);
+      }
       perform(sd, o);
     }
     if (sd.tasks.find(t => t.symbol.original === first.goal)?.triggered) ok++;
     else stuck.push(`${f} ${sd.displayName || ''}: stuck after ${steps} steps at ${last}`);
   }
   if (process.argv.includes('-v')) stuck.forEach(b => console.log('   ', b));
-  check(ok / n >= 0.95, `following NOW finishes ${ok}/${n} quests`);
+  check(ok / n >= 0.98, `following NOW finishes ${ok}/${n} quests`);
+  if (process.argv.includes('-j')) jt.list.forEach(b => console.log('   ', b));
+  check(jt.agree / jt.named >= JOURNAL_AGREE, `NOW goes where the journal's latest entry points: ${jt.agree}/${jt.named} steps`);
 }
 
 // The Delivery Boy: the package is handed over at the start; deliver it, the recipient pays

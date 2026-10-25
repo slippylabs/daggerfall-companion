@@ -1,8 +1,8 @@
 // Quests tab: every quest script as a walkthrough - what it asks, the time limit, and who pays.
-import { loadQuests, normalise } from './data.js?v=16';
-import { el, fill } from './ui.js?v=16';
-import { templateSegments, stepText, rewardGivers, questProgress } from './questText.js?v=16';
-import { trackQuest, isTracked } from './myquests.js?v=16';
+import { loadQuests, normalise } from './data.js?v=17';
+import { el, fill } from './ui.js?v=17';
+import { templateSegments, stepText, rewardGivers, questProgress } from './questText.js?v=17';
+import { trackQuest, isTracked } from './myquests.js?v=17';
 
 const $ = id => document.getElementById(id);
 let quests = null, selected = null, tabs = null;
@@ -66,17 +66,18 @@ function templatePara(x, parts, names, days) {
 
 // Opens a quest; names/days come from a recognised journal entry (journal.js) or a save; guide is the save's open
 // objectives (saveImport.guideFor), which mark the step the player is on
-export async function showQuest(x, names = null, days = null, guide = null) {
+export async function showQuest(x, names = null, days = null, guide = null, journal = null) {
   tabs?.show('quests');
   await initQuests();
   $('quest-search').value = x.title || x.file;
-  show(x, names, days, guide);
+  show(x, names, days, guide, journal);
 }
 
 const MARK = { done: '✓', now: '▶', next: '›', todo: '·' };
 const MARK_WORD = { done: 'done', now: 'you are here', next: 'next', todo: 'later' };
 
-function show(x, names = null, days = null, guide = null) {
+// journal: the player's real journal entries from a save (saveImport.journalOf), newest last
+function show(x, names = null, days = null, guide = null, journal = null) {
   selected = x;
   renderList();
   const r = x.reward;
@@ -122,7 +123,9 @@ function show(x, names = null, days = null, guide = null) {
         s === 'now' ? el('span', { class: 'dg-tag dg-tag-warn dg-st-tag', text: 'you are here' }) : s === 'next' ? el('span', { class: 'dg-tag dg-st-tag', text: 'next' }) : null);
     })) : null,
 
-    log.length ? el('h3', { text: names ? 'Your journal' : 'Your journal will say' }) : null,
+    journal?.length ? el('h3', { text: 'Your journal now' }) : null,
+    ...(journal || []).slice().sort((a, b) => a.time - b.time).map(e => templatePara(x, e.parts, names, days)),
+    log.length ? (journal?.length ? el('h3', { class: 'dg-dim', text: 'Every entry this quest can write' }) : el('h3', { text: names ? 'Your journal' : 'Your journal will say' })) : null,
     ...log.map(t => templatePara(x, t.parts, names, days)),
     log.length && !names ? el('p', { class: 'tool-note', text: 'Highlighted parts are filled in by the game for your quest: paste your real entry into the Journal tab and the guide fills them in.' }) : null,
 

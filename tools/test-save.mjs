@@ -54,8 +54,39 @@ for (const [kind, bytes] of Object.entries(files)) {
     `[${kind}] walkthrough, beast alive: kill = now, reward = next, step ${pOld.step} of ${pOld.total}`);
   check(pNow.status[kOld] === 'done' && pNow.status[kRew] === 'now' && pNow.step === 2, `[${kind}] walkthrough, beast slain: kill done, reward now, step ${pNow.step} of ${pNow.total}`);
   check(pDv.status[dv.q.steps.findIndex(st => st.k === 'bring')] === 'now' && pDv.total === 1, `[${kind}] Delivery Boy: the delivery (with its click and payment) is the one step, now`);
+  // the journal, as the game writes it: the save's own entries with the blanks filled in from the save
+  const jd = dv?.journal?.[0], jh = hn?.journal?.[0];
+  check(dv?.journal?.length === 1 && /Gondywyr Hearthhouse of Daggerfall/.test(jd?.text) && /delivering a package to Bedoryan Kingwing, also of Daggerfall\./.test(jd?.text) && !/[_%]/.test(jd?.text),
+    `[${kind}] Delivery Boy journal: "${jd?.text?.slice(0, 70)}…"`);
+  check(jd?.lastPlace === null && jh?.lastPlace?.sym === '_mondung_' && jh.lastPlace.loc === idx('Ruins of Wickston Manor') && /lair, Ruins of Wickston Manor/.test(jh.text),
+    `[${kind}] the place the journal names (DFU's last Place in the entry): none for the delivery, the lair for the hunt`);
   const spot = old?.spots?._mondung_?.[0];
   check(old?.spots?._mondung_?.length === 1 && spot.what[0] === '_werewolf_', `[${kind}] the werewolf's spot inside the dungeon`);
+}
+// one parser for the build and the save reader: every journal message in every quest, parsed from the game's own
+// compiled message lines, gives the build's own template (quests.json)
+{
+  const { compile, questFiles } = await import('./lib/questSim.mjs');
+  const { parseTemplate } = await import('../site/js/questText.js');
+  const byFile = new Map(quests.map(q => [q.file, q]));
+  let n = 0, same = 0;
+  const differ = [];
+  for (const f of questFiles()) {
+    const q = byFile.get(f), sd = q && compile(f);
+    if (!sd) continue;
+    const kind = new Map(sd.resources.map(r => [r.symbol.original, r.type]));
+    for (const t of q.templates.filter(t => t.kind === 'log' && t.v === 0)) {
+      const m = sd.messages.find(x => x.id === t.id);
+      if (!m) continue;
+      n++;
+      const cut = m.lines.findIndex(l => l.trim() === '<--->');
+      const text = (cut < 0 ? m.lines : m.lines.slice(0, cut)).map(l => l.replace(/<[a-z]{2}>/gi, '').trim()).join(' ').replace(/\s+/g, ' ').trim();
+      const got = parseTemplate(text, s => (q.resources[s] ? { sym: s, kind: kind.get(s) || q.resources[s].kind } : null));
+      const blanks = ps => JSON.stringify(ps.filter(p => typeof p !== 'string'));
+      if (blanks(got) === blanks(t.parts)) same++; else if (differ.length < 3) differ.push(`${f} ${t.id}`);
+    }
+  }
+  check(n > 350 && same / n >= 0.99, `journal messages read from a save fill the same blanks as the build's: ${same}/${n}${differ.length ? ` (differ: ${differ.join(', ')})` : ''}`);
 }
 let bad = false;
 try { await readSaves(new Blob(['hello'])); } catch { bad = true; }

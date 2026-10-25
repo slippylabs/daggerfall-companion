@@ -2,6 +2,32 @@
 // journal entry was recognised, with the names the game filled in for this player's quest.
 // names: { sym: { 1: 'Bedoryan Kingwing', 3: 'Daggerfall' } }, days: { sym: '5' }
 
+// A message as a template: literal text plus typed blanks the game fills in (DFU QuestMacroHelper):
+//   {s: sym, n: 1..4}  _x_ name, __x_ building, ___x_ town, ____x_ region (person or place)
+//   {c: sym}           =x_  a timer's days        {m: 'g2'}  a %macro (date, pronoun, player...)
+// lookup(sym) gives the quest's own spelling of a symbol and its kind ({sym, kind}), or null for no such resource.
+// Shared by the build (tools/build-quests.mjs, on the scripts) and the save reader (the journal's own messages).
+export function parseTemplate(text, lookup) {
+  const parts = [];
+  const re = /(?<![\w])(_{1,4})([A-Za-z0-9.]+?_)(?![\w])|=([A-Za-z0-9.]+?_)(?![\w])|%([a-z][a-z0-9]*)/g;
+  let last = 0, m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    if (m[2]) {
+      const r = lookup('_' + m[2]);
+      parts.push(r ? { s: r.sym, n: m[1].length } : m[0]);
+    } else if (m[3]) {
+      // =x_ is a timer's days for a Clock; for anything else it names the thing (=monster_)
+      const r = lookup('_' + m[3]);
+      parts.push(!r ? m[0] : r.kind === 'Clock' ? { c: r.sym } : { s: r.sym, n: 1 });
+    }
+    else parts.push({ m: m[4] });
+    last = re.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
 const role = (q, sym) => q.resources[sym]?.role ?? sym.replace(/_/g, ' ').trim();
 const isPerson = (q, sym) => q.resources[sym]?.kind === 'Person';
 

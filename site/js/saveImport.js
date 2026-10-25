@@ -3,8 +3,9 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=16';
-import { questNow } from './questNow.js?v=16';
+import { data } from './data.js?v=17';
+import { questNow } from './questNow.js?v=17';
+import { parseTemplate, templateSegments } from './questText.js?v=17';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -126,6 +127,7 @@ export function guideFor(sq, snap, extra = {}) {
   };
   return objectives.map(o => {
     const base = { kind: o.kind, later: !!o.later, payer: !!o.payer, answer: o.answer || null, injure: !!o.injure, count: o.count || 1, automatic: !!o.automatic,
+      hours: o.hours || null, fromJournal: !!o.fromJournal,
       // the quest's own symbols, so the walkthrough's steps can be matched to where the player is
       syms: { npc: o.npc || null, foe: o.foe || null, item: o.item || null, place: o.place || null } };
     const item = o.item ? itemName(res.get(o.item), extra.names) : null;
@@ -140,9 +142,36 @@ export function guideFor(sq, snap, extra = {}) {
       case 'use': return { ...base, item };
       case 'cast': return { ...base, spell: extra.names?.spells?.[o.spell] || `spell ${o.spell}` };
       case 'go': return { ...base, ...at(o.place) };
+      case 'wait': {
+        const c = res.get(o.clock)?.resourceSpecific || {};
+        return { ...base, days: c.remainingTimeInSeconds > 0 ? Math.max(1, Math.ceil(c.remainingTimeInSeconds / 86400)) : null };
+      }
       default: return base;
     }
   });
+}
+
+// The player's journal for a quest, as the game writes it: the save's active log steps (Quest.activeLogMessages, in
+// the order written), each the quest's own message, its first wording (the journal shows variant 0), the blanks
+// filled from the save. lastPlace: the last Place the entry names (DFU GetLastPlaceMentionedInMessage - where the
+// game's own journal, town map ring and compass send the player), as {sym, loc, building}.
+export function journalOf(sq, q, { names, locs, buildings, key, days }) {
+  const msgs = new Map((sq.messages || []).map(m => [m.id, m]));
+  const kindOf = new Map((sq.resources || []).map(r => [key(r.symbol?.original), r.type]));
+  const lookup = s => { const k = key(s); return k ? { sym: k, kind: kindOf.get(k) || q.resources[k]?.kind } : null; };
+  const out = [];
+  for (const e of sq.activeLogMessages || []) {
+    const lines = [];
+    for (const l of msgs.get(e.messageID)?.lines || []) { if (l.trim() === '<--->') break; lines.push(l.replace(/<[a-z]{2}>/gi, '')); }
+    const text = lines.map(l => l.trim()).join(' ').replace(/\s+/g, ' ').trim();
+    if (!text) continue;
+    const parts = parseTemplate(text, lookup);
+    const segs = templateSegments(q, parts, names, days);
+    const place = [...parts].reverse().find(p => p?.s && lookup(p.s)?.kind === 'Place')?.s ?? null;
+    out.push({ step: e.stepID, time: e.time ?? 0, text: segs.map(x => x.text).join('').replace(/\s+([,.!?;:])/g, '$1').replace(/\s+/g, ' ').trim(), parts,
+      lastPlace: place ? { sym: place, loc: locs[place] ?? null, building: buildings[place] || null } : null });
+  }
+  return out;
 }
 
 // The active quests of a save, each as {q, names, days, daysLeft, locs} in the shape the journal reader gives
@@ -198,6 +227,11 @@ export function questsInSave(snap, quests, extra = {}) {
       else if (r.type === 'Person') {
         const sd = site(rs.lastAssignedPlaceSymbol?.original) || site(rs.homePlaceSymbol?.original);
         put(k, sd, { 1: rs.displayName, 2: sd?.buildingName });
+      } else if (r.type === 'Item') {
+        const n = itemName(r, extra.names);
+        if (n) names[k] = { 1: n };
+      } else if (r.type === 'Foe') {
+        if (rs.typeName || rs.displayName) names[k] = { 1: rs.typeName || rs.displayName };
       } else if (r.type === 'Clock' && rs.clockEnabled && !rs.clockFinished && rs.remainingTimeInSeconds > 0) {
         clocks[k] = Math.max(1, Math.ceil(rs.remainingTimeInSeconds / 86400));
         days[k] = String(clocks[k]);
@@ -207,7 +241,8 @@ export function questsInSave(snap, quests, extra = {}) {
     const daysLeft = clocks[q.timer] ?? (Object.keys(clocks).length ? Math.min(...Object.values(clocks)) : null);
     let guide = null;
     try { guide = guideFor(sq, snap, extra); } catch (e) { console.warn('guide', sq.questName, e); }
-    out.push({ q, names, days, daysLeft, locs, buildings, spots, guide, uid: sq.uid });
+    const journal = journalOf(sq, q, { names, days, locs, buildings, key });
+    out.push({ q, names, days, daysLeft, locs, buildings, spots, guide, journal, uid: sq.uid });
   }
   return { found: out, unknown };
 }

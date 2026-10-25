@@ -238,6 +238,9 @@ def run(base, width, height, mobile):
         hn = page.locator('#mine-list .dg-mine-now:has-text("Hunt for a Lycanthrope") .dg-step-now').inner_text()
         check('Collect your reward from Lord Kain Mastercroft' in hn and 'The Fighters Guild' in hn, f'[{tag}] Hunt (beast slain) NOW: collect the reward at the Fighters Guild')
         check('away' in dv, f'[{tag}] NOW shows the trip from where you are')
+        # the player's own journal, on the card: the game's words with the save's names
+        jl = page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-jline').inner_text()
+        check('Journal:' in jl and 'Bedoryan Kingwing' in jl and 'Gondywyr Hearthhouse' in jl and '_' not in jl, f'[{tag}] the card shows the journal entry ({jl[:60]}…)')
         page.screenshot(path=str(SHOTS / f'save_{tag}.png'), full_page=True)
         # NOW's Town map: the recipient's house circled
         page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-go-town').click()

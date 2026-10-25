@@ -5,6 +5,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DFO, writeOut } from './lib/env.mjs';
+import { parseTemplate } from '../site/js/questText.js';
 
 const QDIR = join(DFO, 'vendor/dfu-quests');
 
@@ -131,11 +132,11 @@ function parseQuest(text, file) {
   const messages = {};
   let cur = null;
   for (const l of lines.slice(qrcAt + 1, qbnAt)) {
-    const m = l.match(/^(\w+):\s*\[?(\d+)\]?\s*$/);
+    const m = l.match(/^\s*(\w+):\s*\[?(\d+)\]?\s*$/);   // (M0B00Y17 indents one header: " Message:  1022")
     if (m) { cur = { kind: m[1], id: +m[2], variants: [[]] }; messages[cur.id] = cur; continue; }
     if (!cur) continue;
     if (l.trim() === '<--->') cur.variants.push([]);
-    else if (/^\s*--/.test(l)) continue;   // a script comment, not message text
+    else if (/^-|^\s*--/.test(l)) continue;   // a script comment, not message text (DFO parser.js: a RAW line starting '-')
     else cur.variants[cur.variants.length - 1].push(l.replace(/<ce>/g, '').trim());
   }
   const variantsOf = id => (messages[id]?.variants ?? [])
@@ -169,26 +170,7 @@ function parseQuest(text, file) {
   // A message as a template: literal text plus typed blanks the game fills in.
   //   {s: sym, n: 1..4}  _x_ name, __x_ building, ___x_ town, ____x_ region (person or place)
   //   {c: sym}           =x_  a timer's days        {m: 'g2'}  a %macro (date, pronoun, player...)
-  const template = text => {
-    const parts = [];
-    const re = /(?<![\w])(_{1,4})([A-Za-z0-9.]+?_)(?![\w])|=([A-Za-z0-9.]+?_)(?![\w])|%([a-z][a-z0-9]*)/g;
-    let last = 0, m;
-    while ((m = re.exec(text))) {
-      if (m.index > last) parts.push(text.slice(last, m.index));
-      if (m[2]) {
-        const sym = '_' + m[2];
-        parts.push(res[sym] ? { s: sym, n: m[1].length } : m[0]);
-      } else if (m[3]) {
-        // =x_ is a timer's days for a Clock; for anything else it names the thing (=monster_)
-        const sym = '_' + m[3];
-        parts.push(!res[sym] ? m[0] : res[sym].kind === 'Clock' ? { c: sym } : { s: sym, n: 1 });
-      }
-      else parts.push({ m: m[4] });
-      last = re.lastIndex;
-    }
-    if (last < text.length) parts.push(text.slice(last));
-    return parts;
-  };
+  const template = text => parseTemplate(text, sym => (res[sym] ? { sym, kind: res[sym].kind } : null));
 
   // ---- Reward giver: the NPC clicked in (or waited on by) the task that runs "give pc" ----
   const byName = Object.fromEntries(tasks.map(t => [t.name, t]));
