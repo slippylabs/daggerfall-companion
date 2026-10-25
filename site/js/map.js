@@ -1,8 +1,8 @@
 // Map tab: the game's own travel-map art. World view = TRAV0I00 (click a region);
 // region view = its FMAP page(s) with every location dot placed by the game's own law.
-import { data, regionName, typeWord, searchLocations, travelBetween, loadRoads } from './data.js?v=11';
-import { el, fill, autocomplete, locationCard } from './ui.js?v=11';
-import { state, registerMap, onChange } from './state.js?v=11';
+import { data, regionName, typeWord, searchLocations, travelBetween, loadRoads } from './data.js?v=12';
+import { el, fill, autocomplete, locationCard } from './ui.js?v=12';
+import { state, registerMap, onChange } from './state.js?v=12';
 
 const $ = id => document.getElementById(id);
 const canvas = $('map-canvas'), ctx = canvas.getContext('2d');
@@ -12,7 +12,7 @@ const img = src => images[src] ||= Object.assign(new Image(), { src: `img/${src}
 
 const view = { mode: 'world', region: -1, page: 0, zoom: 1, ox: 0, oy: 0, selected: -1, pins: [], route: null };
 const LEGEND = [
-  ['City / town / village', 11], ['Dungeon', 1], ['Temple / shrine', 8], ['Tavern', 10], ['Farm / manor / cottage', 5], ['Graveyard / coven', 3],
+  ['Town / village', 11], ['Dungeon', 1], ['Temple / shrine', 8], ['Tavern', 10], ['Farm / manor / cottage', 5], ['Graveyard / coven', 3],
 ];
 
 // Roads, tracks, rivers and streams (Basic Roads by Hazelnut, as in DFO Online), colours as the game's
@@ -24,6 +24,44 @@ const DIRS = [[128, 0, -1], [64, 1, -1], [32, 1, 0], [16, 1, 1], [8, 0, 1], [4, 
 let showRoads = true;
 try { showRoads = localStorage.getItem('dg-roads') !== '0'; } catch { /* storage blocked: roads on */ }
 const roadPaths = new Map();
+
+// Cities stand out: a gold diamond and their name on the map (region capitals always, the rest where the name
+// fits without covering another); on a zoomed-in region page the towns get names too
+let showNames = true;
+try { showNames = localStorage.getItem('dg-citynames') !== '0'; } catch { /* storage blocked: names on */ }
+const isCity = i => data.locs.type[i] === 0;
+const isCapital = i => isCity(i) && data.locs.name[i] === regionName(data.locs.region[i]);
+function diamond(x, y, r) {
+  ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
+  ctx.fillStyle = '#f2cd52'; ctx.fill();
+  ctx.lineWidth = Math.max(1.5, r * 0.32); ctx.strokeStyle = '#2a1a0b'; ctx.stroke();
+}
+// names placed greedily, most important first; one that would overlap a placed name (or a marker) is skipped
+function placeNames(items, size) {
+  const placed = [];
+  ctx.font = `600 ${size}px 'EB Garamond', Georgia, serif`;
+  ctx.textBaseline = 'middle';
+  for (const it of items) {
+    const w = ctx.measureText(it.text).width + 8, h = size + 4;
+    const spots = [[it.x + it.r + 3, it.y - h / 2], [it.x - it.r - 3 - w, it.y - h / 2], [it.x - w / 2, it.y - it.r - 2 - h], [it.x - w / 2, it.y + it.r + 2]];
+    const spot = spots.find(([x, y]) => x >= 0 && y >= 0 && x + w <= canvas.width && y + h <= canvas.height
+      && !placed.some(q => x < q[0] + q[2] && x + w > q[0] && y < q[1] + q[3] && y + h > q[1]));
+    if (!spot && !it.must) continue;
+    const [x, y] = spot || spots[0];
+    placed.push([x, y, w, h]);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(3, size * 0.28);
+    ctx.strokeStyle = 'rgba(238,222,190,0.92)';
+    ctx.strokeText(it.text, x + 4, y + h / 2);
+    ctx.fillStyle = it.capital ? '#7a1810' : '#2a1a0b';
+    ctx.fillText(it.text, x + 4, y + h / 2);
+  }
+  ctx.textBaseline = 'alphabetic';
+}
+// the overview picture is the world map at 0.32 of a map pixel, under a 12-pixel title strip
+const worldPos = i => [data.locs.px[i] * 0.32 + 0.16, data.locs.py[i] * 0.32 + 12.16];
+let cityList = null;
+const cities = () => (cityList ||= [...Array(data.count).keys()].filter(isCity));
 
 // A map pixel's place on a region page, by the same law as the dots (bottom-up texture offset x scale)
 function pagePos(p, mx, my) {
@@ -124,11 +162,17 @@ export function initMap() {
   canvas.addEventListener('wheel', e => { if (view.mode !== 'region') return; e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.25 : 0.8, e.offsetX, e.offsetY); }, { passive: false });
   new ResizeObserver(() => { fit(); draw(); }).observe(canvas.parentElement);
 
-  fill($('map-legend'), ...LEGEND.map(([label, c]) =>
+  fill($('map-legend'), el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-diamond' }), 'City'), ...LEGEND.map(([label, c]) =>
     el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-dot', style: `background:${data.dots.dotColors[c]}` }), label)),
   el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-line', style: 'background:rgb(60,60,60)' }), 'Road'),
   el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-line', style: 'background:rgb(160,118,74)' }), 'Dirt track'),
   el('span', { class: 'dg-legend-item' }, el('span', { class: 'dg-legend-line', style: 'background:rgb(48,79,250)' }), 'River'),
+  el('label', { class: 'tool-check dg-legend-item dg-roads-toggle' },
+    el('input', { type: 'checkbox', id: 'map-names', checked: showNames, onchange: e => {
+      showNames = e.target.checked;
+      try { localStorage.setItem('dg-citynames', showNames ? '1' : '0'); } catch { /* kept for this visit */ }
+      draw();
+    } }), ' City names'),
   el('label', { class: 'tool-check dg-legend-item dg-roads-toggle' },
     el('input', { type: 'checkbox', id: 'map-roads', checked: showRoads, onchange: e => {
       showRoads = e.target.checked;
@@ -247,8 +291,9 @@ function hover(x, y) {
   x *= devicePixelRatio; y *= devicePixelRatio;
   let text = '';
   if (view.mode === 'world') {
+    const c = cityAtWorld(x, y);
     const r = regionAtWorld(x, y);
-    text = r >= 0 ? regionName(r) : '';
+    text = c >= 0 ? `${data.locs.name[c]} — city, ${regionName(data.locs.region[c])}` : r >= 0 ? regionName(r) : '';
   } else {
     const i = dotAt(x, y);
     if (i >= 0) text = `${data.locs.name[i]} — ${typeWord(i)}`;
@@ -269,6 +314,8 @@ function regionAtWorld(x, y) {
 function click(x, y) {
   x *= devicePixelRatio; y *= devicePixelRatio;
   if (view.mode === 'world') {
+    const c = cityAtWorld(x, y);
+    if (c >= 0) { select(c); return; }
     const r = regionAtWorld(x, y);
     if (r >= 0) { $('map-region').value = r; openRegion(r); }
     return;
@@ -307,10 +354,20 @@ function draw() {
   }
 
   const size = Math.max(2 * devicePixelRatio, s * 0.9);
-  for (const [, dx, dy, c] of p.dots) {
+  for (const [loc, dx, dy, c] of p.dots) {
+    if (isCity(loc)) continue;
     ctx.fillStyle = data.dots.dotColors[c];
     ctx.fillRect(view.ox + (dx + 0.5) * s - size / 2, view.oy + (dy + 0.5) * s - size / 2, size, size);
   }
+  // cities on top: gold diamonds, then the names
+  const cr = Math.max(5 * devicePixelRatio, s * 1.3);
+  const labels = [];
+  for (const [loc, dx, dy] of p.dots) {
+    const x = view.ox + (dx + 0.5) * s, y = view.oy + (dy + 0.5) * s;
+    if (isCity(loc)) { diamond(x, y, cr); labels.push({ x, y, r: cr, text: data.locs.name[loc], capital: isCapital(loc), must: isCapital(loc), rank: isCapital(loc) ? 0 : 1 }); }
+    else if (view.zoom >= 2 && data.locs.type[loc] <= 2) labels.push({ x, y, r: size / 2, text: data.locs.name[loc], rank: 2 + data.locs.type[loc] });
+  }
+  if (showNames) placeNames(labels.sort((a, b) => a.rank - b.rank), Math.round(13 * devicePixelRatio));
   // markers: where I am (blue), pins (orange), selection (white ring + label)
   const mark = (i, colour, label) => {
     const d = p.dots.find(x => x[0] === i);
@@ -338,4 +395,22 @@ function drawWorld() {
   if (!image.complete) return;
   const s = Math.min(canvas.width / 320, canvas.height / 200), ox = (canvas.width - 320 * s) / 2;
   ctx.drawImage(image, ox, 0, 320 * s, 200 * s);
+  const r = Math.max(3.5 * devicePixelRatio, s * 1.1);
+  const labels = [];
+  for (const i of cities()) {
+    const [wx, wy] = worldPos(i), x = ox + wx * s, y = wy * s;
+    diamond(x, y, isCapital(i) ? r * 1.35 : r);
+    labels.push({ x, y, r, text: data.locs.name[i], capital: isCapital(i), must: isCapital(i), rank: isCapital(i) ? 0 : 1 });
+  }
+  if (showNames) placeNames(labels.sort((a, b) => a.rank - b.rank), Math.round(Math.max(11, Math.min(14, s * 3.2)) * devicePixelRatio));
+}
+// the city under the pointer on the overview, or -1
+function cityAtWorld(x, y) {
+  const s = Math.min(canvas.width / 320, canvas.height / 200), ox = (canvas.width - 320 * s) / 2;
+  let best = -1, bestD = (Math.max(7 * devicePixelRatio, s * 2)) ** 2;
+  for (const i of cities()) {
+    const [wx, wy] = worldPos(i), d = (ox + wx * s - x) ** 2 + (wy * s - y) ** 2;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
 }

@@ -3,7 +3,7 @@
 // other byte a building of type byte-1. Blocks go north row first (as DFO exteriorAutomapWindow.js lays them),
 // so the image is the town north-up, 64 pixels a block. A building's anchor is
 // (bx*64 + x/102.4*64, h*64-1 - (by*64 + z/102.4*64)); its footprint is the patch of its byte around that.
-import { el, fill } from './ui.js?v=11';
+import { el, fill } from './ui.js?v=12';
 
 const PX = 64, BLOCK = 102.4;
 const blocks = {};

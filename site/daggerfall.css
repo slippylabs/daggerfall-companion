@@ -353,3 +353,4 @@ code { color: var(--gold); }
 .dg-dungeon-fold { margin-top: 14px; }
 .dg-dungeon-fold > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-family: var(--caps); color: var(--gold); letter-spacing: 0.05em; }
 .dg-dungeon-fold[hidden] { display: none; }
+.dg-legend-diamond { display: inline-block; width: 10px; height: 10px; margin-right: 6px; background: #f2cd52; border: 1.5px solid #2a1a0b; transform: rotate(45deg); vertical-align: middle; }

@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=11';
-import { el, fill } from './ui.js?v=11';
-import { state, onChange, showOnMap, setHere } from './state.js?v=11';
-import { rewardGivers, nameFor, stepText } from './questText.js?v=11';
-import { showQuest } from './quests.js?v=11';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=11';
-import { planRoute } from './route.js?v=11';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=11';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=12';
+import { el, fill } from './ui.js?v=12';
+import { state, onChange, showOnMap, setHere } from './state.js?v=12';
+import { rewardGivers, nameFor, stepText } from './questText.js?v=12';
+import { showQuest } from './quests.js?v=12';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=12';
+import { planRoute } from './route.js?v=12';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=12';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';

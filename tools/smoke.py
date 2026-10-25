@@ -110,6 +110,9 @@ def run(base, width, height, mobile):
         roads_off = page.evaluate(road_px)
         check(roads_on > 500 and roads_off < roads_on / 10, f'[{tag}] roads drawn on the region map, and the toggle hides them ({roads_on} -> {roads_off} px)')
         page.click('label:has(#map-roads)')
+        g = page.evaluate('''() => { const c = document.querySelector('#map-canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+          let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] === 242 && d[i + 1] === 205 && d[i + 2] === 82) n++; return n; }''')
+        check(g > (100 if mobile else 200), f'[{tag}] region map: cities are gold diamonds ({g} px)')
         page.screenshot(path=str(SHOTS / f'map_{tag}.png'), full_page=True)
 
         # Map search
@@ -124,6 +127,12 @@ def run(base, width, height, mobile):
         page.click('#map-world')
         page.wait_for_timeout(300)
         check('tap a region' in page.inner_text('#map-title'), f'[{tag}] world view shows')
+        gold = '''() => { const c = document.querySelector('#map-canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+          let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] === 242 && d[i + 1] === 205 && d[i + 2] === 82) n++; return n; }'''
+        page.wait_for_timeout(300)
+        g = page.evaluate(gold)
+        check(g > (500 if mobile else 1500), f'[{tag}] world view: the cities are gold diamonds ({g} px)')
+        page.screenshot(path=str(SHOTS / f'world_{tag}.png'), full_page=True)
 
         # Quests
         page.click('.hud-tab[data-tab="quests"]')
