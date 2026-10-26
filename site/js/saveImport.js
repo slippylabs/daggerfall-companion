@@ -3,9 +3,9 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=17';
-import { questNow } from './questNow.js?v=17';
-import { parseTemplate, templateSegments } from './questText.js?v=17';
+import { data } from './data.js?v=18';
+import { questNow } from './questNow.js?v=18';
+import { parseTemplate, templateSegments } from './questText.js?v=18';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -151,6 +151,27 @@ export function guideFor(sq, snap, extra = {}) {
   });
 }
 
+// A quest's state in short, for a bug report (the card's "Copy for help"): what the guide decided and from what -
+// the open objectives by symbol, the tasks done, the journal steps, and each resource's name and place
+function questDebug(sq, snap) {
+  const s = x => (x && typeof x === 'object' ? x.original : x) || null;
+  const r = questNow(sq, questItems(snap));
+  const where = sd => sd && [sd.locationName, sd.buildingName, ['', 'town', 'dungeon', 'building'][sd.siteType] || sd.siteType].filter(Boolean).join(' / ');
+  return {
+    quest: sq.questName, goal: r.goal, journalPlace: r.journal || null,
+    now: r.objectives.map(o => Object.fromEntries(Object.entries({ kind: o.kind, npc: o.npc, foe: o.foe, item: o.item, place: o.place, later: o.later, fromJournal: o.fromJournal, hours: o.hours, clock: o.clock }).filter(([, v]) => v != null && v !== false))),
+    done: (sq.tasks || []).filter(t => t.triggered).map(t => s(t.symbol)),
+    dropped: (sq.tasks || []).filter(t => t.dropped).map(t => s(t.symbol)),
+    log: (sq.activeLogMessages || []).map(e => `${e.stepID}:${e.messageID}`),
+    held: questItems(snap).filter(i => i.questUID === sq.uid).map(i => i.symbol),
+    res: (sq.resources || []).map(x => {
+      const p = x.resourceSpecific || {};
+      return [s(x.symbol), x.type, p.displayName || p.typeName || p.item?.name || where(p.siteDetails) || '',
+        s(p.lastAssignedPlaceSymbol) || s(p.homePlaceSymbol) || (x.type === 'Clock' && p.remainingTimeInSeconds != null ? `${Math.round(p.remainingTimeInSeconds / 3600)}h left` : '') || ''].filter(Boolean).join(' | ');
+    }),
+  };
+}
+
 // The player's journal for a quest, as the game writes it: the save's active log steps (Quest.activeLogMessages, in
 // the order written), each the quest's own message, its first wording (the journal shows variant 0), the blanks
 // filled from the save. lastPlace: the last Place the entry names (DFU GetLastPlaceMentionedInMessage - where the
@@ -242,7 +263,9 @@ export function questsInSave(snap, quests, extra = {}) {
     let guide = null;
     try { guide = guideFor(sq, snap, extra); } catch (e) { console.warn('guide', sq.questName, e); }
     const journal = journalOf(sq, q, { names, days, locs, buildings, key });
-    out.push({ q, names, days, daysLeft, locs, buildings, spots, guide, journal, uid: sq.uid });
+    let debug = null;
+    try { debug = questDebug(sq, snap); } catch (e) { debug = { error: e.message }; }
+    out.push({ q, names, days, daysLeft, locs, buildings, spots, guide, journal, debug, uid: sq.uid });
   }
   return { found: out, unknown };
 }

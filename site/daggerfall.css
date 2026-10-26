@@ -315,6 +315,9 @@ code { color: var(--gold); }
 .dg-now-side { display: inline-flex; align-items: center; gap: 8px; flex: none; }
 .dg-done { min-width: 44px; min-height: 40px; border: 2px solid var(--ink-soft); background: rgba(255, 245, 215, 0.4); color: #1f5f24; font-size: 1.2rem; font-weight: 700; cursor: pointer; border-radius: 3px; }
 .dg-done:hover { background: #1f5f24; color: #fff; border-color: #1f5f24; }
+.dg-help { min-height: 40px; padding: 0 10px; border: 1px solid var(--ink-soft); background: transparent; color: var(--ink-soft); font-family: var(--serif); font-size: 0.85rem; cursor: pointer; border-radius: 3px; }
+.dg-help:hover { background: rgba(255, 245, 215, 0.4); color: var(--ink); }
+.dg-help-text { display: block; width: 100%; height: 160px; margin-top: 8px; font-family: monospace; font-size: 0.8rem; }
 .dg-mine-now .dg-step-block { display: block; grid-template-columns: none; margin-top: 8px; padding: 8px 12px 10px; }
 .dg-sign { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--ink); line-height: 1.25; }
 .dg-sign-arrow { color: var(--ink-red); font-size: 0.85rem; }

@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=17';
-import { el, fill } from './ui.js?v=17';
-import { state, onChange, showOnMap, setHere } from './state.js?v=17';
-import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=17';
-import { showQuest } from './quests.js?v=17';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=17';
-import { planRoute } from './route.js?v=17';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=17';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=18';
+import { el, fill } from './ui.js?v=18';
+import { state, onChange, showOnMap, setHere } from './state.js?v=18';
+import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=18';
+import { showQuest } from './quests.js?v=18';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=18';
+import { planRoute } from './route.js?v=18';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=18';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -93,7 +93,7 @@ export function applySave(found, character) {
       || list.find(x => x.file === f.q.file && x.uid == null && compatible(x.names, f.names));
     if (e) refreshed++;
     else { e = { file: f.q.file, done: [], jobDone: false, saved: Date.now(), fresh: Date.now() }; list.unshift(e); added++; }
-    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, spots: f.spots, guide: f.guide, journal: f.journal || [], uid: f.uid, character, synced: Date.now() });
+    Object.assign(e, { names: f.names, days: f.days, daysLeft: f.daysLeft, locs: f.locs, buildings: f.buildings, spots: f.spots, guide: f.guide, journal: f.journal || [], debug: f.debug || null, uid: f.uid, character, synced: Date.now() });
     e.key = f.q.file + '|' + JSON.stringify(f.names);
     seen.add(e);
   }
@@ -201,6 +201,29 @@ function journalNote(j, o) {
     : el('button', { class: 'dg-chip-btn', onclick: () => showOnMap(p.loc, null, state.here >= 0 ? [state.here, p.loc] : null) }, 'World');
   return el('div', { class: 'dg-jnote' }, 'Your journal mentions ', el('b', { text: placeName(p) }), '. ', go);
 }
+// everything the card says and what it was worked out from, as text for a bug report
+function cardText(q, entry) {
+  const g = entry.guide || [], pr = questProgress(q, g);
+  const line = o => { const sp = signpost(o); return `${sayAction(o, q)}${sp ? ` @ ${[sp.town, sp.place].filter(Boolean).join(' > ')}` : ''}`; };
+  return [`Quest: ${q.title || q.file} (${q.file}), step ${pr.step} of ${pr.total}${entry.daysLeft != null ? `, ${entry.daysLeft} days left` : ''}`,
+    `NOW: ${g[0] ? line(g[0]) : '(nothing)'}`, g[1] ? `THEN: ${line(g[1])}` : null,
+    ...(entry.journal || []).map(j => `Journal (step ${j.step}): ${j.text}`),
+    `Guide v${document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/)?.[1] || '?'}`,
+    '--- quest state ---', JSON.stringify(entry.debug || {}, null, 1)].filter(Boolean).join('\n');
+}
+async function copyForHelp(btn, q, entry) {
+  const text = cardText(q, entry);
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = el('textarea', { class: 'dg-help-text', readonly: true });
+    ta.value = text;
+    btn.closest('.dg-card').append(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch { /* left selected for Ctrl+C */ }
+  }
+  btn.textContent = 'Copied ✓';
+  setTimeout(() => { btn.textContent = 'Copy for help'; }, 2500);
+}
 // where, as a signpost: town, building, and the part of town it stands in
 function signpost(o) {
   if (o.loc == null) return null;
@@ -247,6 +270,7 @@ function nowCard(q, entry) {
     el('span', { class: 'dg-now-side' },
       pr.total > 1 && !pr.finished ? el('button', { class: 'dg-stepchip', title: 'Open the walkthrough at this step', onclick: () => showQuest(q, entry.names, entry.days, g, entry.journal) }, `step ${pr.step} of ${pr.total}`) : null,
       el('span', { class: 'dg-tag' + (entry.daysLeft != null && entry.daysLeft <= 2 ? ' dg-tag-warn' : ''), text: entry.daysLeft != null ? `${entry.daysLeft} day${entry.daysLeft === 1 ? '' : 's'}` : 'no limit' }),
+      el('button', { class: 'dg-help', title: 'Copy this quest\'s details, to paste into a bug report', onclick: e => copyForHelp(e.currentTarget, q, entry) }, 'Copy for help'),
       el('button', { class: 'dg-done', title: 'Done: remove this quest', 'aria-label': 'Done, remove this quest', onclick: remove }, '✓')));
   const j = latestJournal(entry), jp = j?.lastPlace;
   // nothing the script points to: the place the journal names, else the journal's own words

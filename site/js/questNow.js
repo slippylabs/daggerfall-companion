@@ -17,7 +17,7 @@
 //   journal: that place (journalPlace), for a guide to show beside NOW.
 //   items: the player's quest items, [{questUID, symbol}] (from the save's inventories)
 
-import { parseTemplate } from './questText.js?v=17';
+import { parseTemplate } from './questText.js?v=18';
 
 const sym = s => (s && typeof s === 'object' ? s.original : s) || null;
 

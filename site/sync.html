@@ -43,7 +43,7 @@
 </main>
 <script type="module">
 // The bookmark is js/bookmarklet.js itself, as a javascript: link (whole-line comments dropped)
-const src = await (await fetch('js/bookmarklet.js?v=17')).text();
+const src = await (await fetch('js/bookmarklet.js?v=18')).text();
 const code = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
 const a = document.getElementById('bookmarklet');
 a.href = 'javascript:' + encodeURIComponent(code);

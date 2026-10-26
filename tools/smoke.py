@@ -241,6 +241,13 @@ def run(base, width, height, mobile):
         # the player's own journal, on the card: the game's words with the save's names
         jl = page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-jline').inner_text()
         check('Journal:' in jl and 'Bedoryan Kingwing' in jl and 'Gondywyr Hearthhouse' in jl and '_' not in jl, f'[{tag}] the card shows the journal entry ({jl[:60]}…)')
+        # Copy for help: the card and the quest's state as text
+        page.evaluate("window.__copied = null; navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); }")
+        page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-help').click()
+        page.wait_for_function('window.__copied')
+        copied = page.evaluate('window.__copied')
+        check('Quest: The Delivery Boy (A0C00Y14)' in copied and 'NOW: Give the book' in copied and '"goal"' in copied and '_pickuplocal_ | Person | Bedoryan Kingwing' in copied,
+              f'[{tag}] Copy for help copies the card and the quest state ({len(copied)} chars)')
         page.screenshot(path=str(SHOTS / f'save_{tag}.png'), full_page=True)
         # NOW's Town map: the recipient's house circled
         page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-go-town').click()
