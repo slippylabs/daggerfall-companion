@@ -35,6 +35,9 @@
     .then { margin: 8px 0 0; font-style: italic; opacity: .85; }
     .hint { margin: 8px 0 0; padding: 6px 8px; background: rgba(242,205,82,.15); border-left: 3px solid #f2cd52; }
     .f { padding: 4px 12px 8px; font-size: 12px; opacity: .7; }
+    .warn { margin: 0 0 8px; padding: 6px 8px; border-radius: 4px; background: #8e1f17; color: #fff; font-weight: bold; }
+    .also { margin: 8px 0 0; padding: 6px 8px; border-left: 3px solid #d0453a; background: rgba(208,69,58,.15); cursor: pointer; }
+    .p.urgent { border-color: #d0453a; } .p.urgent .h { background: #5a1f17; border-bottom-color: #d0453a; }
     .small .b, .small .f { display: none; }
   </style>
   <div class="p"><div class="h"><button class="prev" title="Previous quest">\u2039</button><span class="t">Quest helper</span>
@@ -46,7 +49,8 @@
 
   // the panel's buttons never keep the keyboard: the game's keys must still reach the game
   const tap = (sel, fn) => $(sel).addEventListener('click', e => { e.stopPropagation(); fn(); e.currentTarget.blur(); });
-  const current = () => quests.find(q => q.file === pick) || quests[0] || null;
+  // the quest picked with the arrows; else the one running out of time soonest
+  const current = () => quests.find(q => q.file === pick) || [...quests].sort((a, b) => (a.daysLeft ?? 1e9) - (b.daysLeft ?? 1e9))[0] || null;
   const step = d => { if (quests.length < 2) return; const i = quests.indexOf(current()); pick = quests[(i + d + quests.length) % quests.length].file; store.set('dg.helper.quest', pick); draw(); mark(); };
   tap('.prev', () => step(-1));
   tap('.next', () => step(1));
@@ -64,6 +68,9 @@
     e.preventDefault();
   });
 
+  // ---- deadlines: the guide's warning (myquests.js deadline), the panel turns red ----
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const urgency = q => q?.warn || null;
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   let invHint = '';
   function draw() {
@@ -77,13 +84,20 @@
       $('.f').textContent = '';
       return;
     }
-    $('.t').textContent = `${q.title}${quests.length > 1 ? ` (${quests.indexOf(q) + 1}/${quests.length})` : ''}`;
-    $('.b').innerHTML = `<p class="now">${esc(q.now)}.</p>${q.where ? `<p class="where">\u25b6 ${esc(q.where)}</p>` : ''}`
+    $('.t').textContent = `${urgency(q) ? '\u26a0 ' : ''}${q.title}${quests.length > 1 ? ` (${quests.indexOf(q) + 1}/${quests.length})` : ''}`;
+    panel.classList.toggle('urgent', !!urgency(q));
+    // another quest running out of time, one click away
+    const other = quests.find(x => x !== q && urgency(x));
+    $('.b').innerHTML = (urgency(q) ? `<p class="warn">${esc(urgency(q))}</p>` : '')
+      + `<p class="now">${esc(q.now)}.</p>${q.where ? `<p class="where">\u25b6 ${esc(q.where)}</p>` : ''}`
       + (q.steps.length ? `<ol>${q.steps.map(s => `<li>${esc(s)}.</li>`).join('')}</ol>` : '')
       + (invHint ? `<p class="hint">${esc(invHint)}</p>` : '')
       + (q.avoid ? `<p class="avoid"><b>Don't</b> ${esc(q.avoid)}: it spoils the quest.</p>` : '')
       + (q.then ? `<p class="then">Then: ${esc(q.then)}.</p>` : '')
-      + (!q.steps.length && q.journal ? `<p class="then">Journal: \u201c${esc(q.journal)}\u201d</p>` : '');
+      + (!q.steps.length && q.journal ? `<p class="then">Journal: \u201c${esc(q.journal)}\u201d</p>` : '')
+      + (other ? `<p class="also" data-file="${esc(other.file)}">\u26a0 Also running out: <b>${esc(other.title)}</b> (${plural(other.daysLeft, 'day')} left). Click to see it.</p>` : '');
+    const also = $('.also');
+    if (also) also.addEventListener('click', e => { e.stopPropagation(); pick = also.dataset.file; store.set('dg.helper.quest', pick); draw(); mark(); });
     const mins = Math.round((Date.now() - at) / 60000);
     $('.f').textContent = `${q.daysLeft != null ? `${q.daysLeft} day${q.daysLeft === 1 ? '' : 's'} left \u00b7 ` : ''}step ${q.step[0]} of ${q.step[1]} \u00b7 updated ${mins < 1 ? 'just now' : `${mins} min ago`} (the game saves every few minutes)`;
   }

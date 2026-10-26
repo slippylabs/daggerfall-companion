@@ -3,9 +3,9 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=22';
-import { questNow } from './questNow.js?v=22';
-import { parseTemplate, templateSegments } from './questText.js?v=22';
+import { data } from './data.js?v=23';
+import { questNow } from './questNow.js?v=23';
+import { parseTemplate, templateSegments } from './questText.js?v=23';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -91,7 +91,11 @@ function itemName(r, names) {
   if (it.shortName) return it.shortName;
   if (/gold/i.test(it.name || '') && it.stackCount) return `${it.stackCount} gold`;
   const title = it.message != null && /book|parchment/i.test(it.name || '') ? names?.books?.[it.message & 0xff] : null;
-  return title ? `the book "${title}"` : (it.name ? it.name.toLowerCase() : null);
+  if (title) return `the book "${title}"`;
+  // a magic item or artifact the world has yet to make keeps the script's word ("magic_item", "Auriels_Bow")
+  if (it.group === 'Artifacts') return (it.name || '').replace(/^(?!Mehrunes)(\w+?)s_/, "$1's ").replace(/_/g, ' ') || null;
+  if (it.pendingMagicDef) return 'the magic item';
+  return it.name ? it.name.replace(/_/g, ' ').toLowerCase() : null;
 }
 
 // The pack page an item sits on in DFO's inventory (src/ui/packPages.js pageOf for the enhanced screen's nine pages;
@@ -177,17 +181,18 @@ export function guideFor(sq, snap, extra = {}) {
     : v.foe ? { kind: v.kind, who: res.get(v.foe)?.resourceSpecific?.typeName || null, injure: !!v.injure }
       : { kind: v.kind, who: res.get(v.npc)?.resourceSpecific?.displayName || null });
   const out = objectives.map(o => {
-    const base = { kind: o.kind, later: !!o.later, payer: !!o.payer, answer: o.answer || null, injure: !!o.injure, count: o.count || 1, automatic: !!o.automatic,
+    const base = { kind: o.kind, later: !!o.later, payer: !!o.payer, answer: o.answer || null, injure: !!o.injure, spare: !!o.spare, count: o.count || 1, automatic: !!o.automatic,
       hours: o.hours || null, fromJournal: !!o.fromJournal,
       // the quest's own symbols, so the walkthrough's steps can be matched to where the player is
-      syms: { npc: o.npc || null, foe: o.foe || null, item: o.item || null, place: o.place || null } };
-    const item = o.item ? itemName(res.get(o.item), extra.names) : null;
+      syms: { npc: o.npc || null, foe: o.foe || null, item: o.item || o.loot || null, place: o.place || null } };
+    const item = o.item || o.loot ? itemName(res.get(o.item || o.loot), extra.names) : null;
     switch (o.kind) {
       case 'talk': case 'reward': return { ...base, ...(o.npc ? person(o.npc, o.place) : {}) };
       case 'bring': return { ...base, item, ...person(o.npc, o.place) };
-      case 'kill': {
+      case 'kill': case 'loot': {
         const f = res.get(o.foe)?.resourceSpecific || {};
-        return { ...base, who: f.typeName || f.displayName || null, ...at(o.place, o.foe) };
+        const schedule = o.schedule?.map(m => { const w = at(m.place); return { hours: m.hours, loc: w.loc ?? null, name: w.building?.name || site(m.place)?.locationName || null }; }) || null;
+        return { ...base, who: f.typeName || f.displayName || null, item, schedule, comes: !!o.comes, ...at(o.place, o.foe) };
       }
       case 'pickup': case 'drop': return { ...base, item, ...at(o.place, o.item) };
       case 'use': return { ...base, item };

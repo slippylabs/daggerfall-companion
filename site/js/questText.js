@@ -117,7 +117,7 @@ function matches(st, o) {
     case 'reward': return st.k === 'reward' || (st.k === 'talk' && a.includes(s.npc));
     // a delivery is the click on the recipient too, and the reward when the recipient pays
     case 'bring': return (st.k === 'bring' && (a.includes(s.item) || st.b === s.npc)) || (st.k === 'talk' && a.includes(s.npc)) || (o.payer && st.k === 'reward');
-    case 'kill': return st.k === 'kill' && a.includes(s.foe);
+    case 'kill': case 'loot': return st.k === 'kill' && a.includes(s.foe);
     case 'pickup': return st.k === 'pickup' && a.includes(s.item);
     case 'go': return st.k === 'go' && a.includes(s.place);
     default: return false;

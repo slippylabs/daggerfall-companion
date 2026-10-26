@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=22';
-import { el, fill } from './ui.js?v=22';
-import { state, onChange, showOnMap, setHere } from './state.js?v=22';
-import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=22';
-import { showQuest } from './quests.js?v=22';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=22';
-import { planRoute } from './route.js?v=22';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=22';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=23';
+import { el, fill } from './ui.js?v=23';
+import { state, onChange, showOnMap, setHere } from './state.js?v=23';
+import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=23';
+import { showQuest } from './quests.js?v=23';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=23';
+import { planRoute } from './route.js?v=23';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=23';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -164,7 +164,7 @@ async function render() {
 }
 
 // ---- "Do this now": one exact instruction, then the one after it ----
-const plural = (n, w) => n > 1 ? `${n} ${w}s` : w;
+const plural = (n, w) => n <= 1 ? w : `${n} ${/(ief|lf)$/i.test(w) ? w.replace(/f$/, 'ves') : /[^aeiou]y$/i.test(w) ? w.replace(/y$/, 'ies') : /(s|x|ch|sh)$/i.test(w) ? `${w}es` : /man$/i.test(w) ? w.replace(/man$/, 'men') : `${w}s`}`;
 const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 // what to do, in words
 function sayAction(o, q) {
@@ -173,7 +173,8 @@ function sayAction(o, q) {
     case 'talk': return `Talk to ${who}${o.answer === 'yes' ? ' and answer Yes' : ''}`;
     case 'reward': return o.automatic ? 'Your reward comes the moment the job is done' : `Collect your reward from ${who}`;
     case 'bring': return `Give ${thing(o.item)} to ${who}${o.payer ? ', who pays your reward' : ''}`;
-    case 'kill': return o.injure ? `Wound the ${o.who || 'foe'}, but do not kill it` : `Kill ${o.count > 1 ? plural(o.count, o.who || 'foe') : `the ${o.who || 'foe'}`}`;
+    case 'kill': return o.injure ? (o.spare ? `Wound the ${o.who || 'foe'}, but do not kill it` : `Hit the ${o.who || 'foe'} (wounding it is enough)`) : `Kill ${o.count > 1 ? plural(o.count, o.who || 'foe') : `the ${o.who || 'foe'}`}${o.item ? ` and take ${thing(o.item)} from its body` : ''}`;
+    case 'loot': return `Search the ${o.who || 'foe'}'s body and take ${thing(o.item)}`;
     case 'pickup': return `Pick up ${thing(o.item)}`;
     case 'drop': return `Go inside${o.building ? ` ${o.building.name}` : ''} and drop ${o.inv?.name ? `“${o.inv.name}”` : thing(o.item)} on the floor there, then leave it. It only counts inside`;
     case 'use': return `Use ${thing(o.item)} from your inventory`;
@@ -244,10 +245,10 @@ function itemSteps(o, glow = false) {
   if (!v?.name || !['drop', 'bring', 'use'].includes(o.kind)) return null;
   const kept = v.where === 'pack' || !v.where ? 'your pack' : `your ${v.where}`;
   const find = glow ? `Click the ${v.page} button, then the tile glowing gold` : `Click the ${v.page} button (classic screen: the ${v.tab} tab), then click the tile named “${v.name}”${v.icon === 'letter' ? ', a flat brown sheet of paper' : ''}. The pack shows pictures only: the name appears when you click one`;
-  return !v.where ? [`You don't have it any more. ${o.kind === 'drop' ? 'Look on the floor where you dropped it, or' : 'Check'} the step before this one`]
+  return !v.where ? [`It is not in your inventory. If you dropped it, go back for it; if you never had it, your journal says where to get it`]
     : [
       ...(v.where !== 'pack' ? [`It is in ${kept}: move it into your pack first`] : []),
-      ...(o.kind === 'drop' ? [`Walk inside ${o.building?.name || 'the place'}`] : o.kind === 'bring' ? [`Find ${o.who || 'them'} and click them while you carry it`] : []),
+      ...(o.kind === 'drop' ? [`Walk inside ${o.building?.name || 'the place'}`] : o.kind === 'bring' ? [`${glow && signpost(o) ? `Go to ${[signpost(o).town, signpost(o).place].filter(Boolean).join(' › ')}, then click` : 'Find and click'} ${o.who || 'the person'} while ${thing(o.item)} is in your pack`] : []),
       ...(o.kind === 'bring' ? [] : ['Open your inventory (F6)', find]),
       ...(o.kind === 'drop' ? (glow ? ['Drag that tile out of the inventory window and let go', 'Leave it on the floor'] : ['Drag the tile out of the inventory window and let go: it lands on the floor', 'Close the inventory and leave it there. Do not pick it back up'])
         : o.kind === 'use' ? ['Click Use'] : []),
@@ -275,7 +276,11 @@ function helperSteps(o) {
   switch (o.kind) {
     case 'talk': return [go, `Click ${who} to talk`, o.answer === 'yes' ? 'When asked, answer Yes' : null].filter(Boolean);
     case 'reward': return o.automatic ? ['Nothing to do: the reward comes by itself'] : [go, `Click ${who} to collect your reward`].filter(Boolean);
-    case 'kill': return [go, o.spot ? 'The guide\'s Dungeon map shows the exact spot' : null, sayAction(o)].filter(Boolean);
+    case 'kill': return [go, ...(o.schedule || []).map(m => `${clockTime(m.hours[0])}–${clockTime(m.hours[1])}: at ${m.name || 'a place in town'}`),
+      o.schedule ? 'It moves by the hour (game time): go where it is now' : null, o.comes ? `${o.count > 1 ? 'They appear' : 'It appears'} near you once the step before is done: be ready to fight` : null,
+      o.spot ? 'The guide\'s Dungeon map shows the exact spot' : null, o.item ? `Kill the ${o.who || 'foe'}` : sayAction(o),
+      o.item ? `Click its body and take ${thing(o.item)}: it carries it` : null].filter(Boolean);
+    case 'loot': return [go, `Find the ${o.who || 'foe'}'s body where you killed it`, `Click the body and take ${thing(o.item)}`].filter(Boolean);
     case 'pickup': return [go, o.spot ? 'The guide\'s Dungeon map shows the exact spot' : null, `Find ${thing(o.item)} and click it to pick it up`].filter(Boolean);
     case 'go': return [go, o.hours ? `Be there between ${clockTime(o.hours[0])} and ${clockTime(o.hours[1])} (game time)` : null].filter(Boolean);
     default: return [go, sayAction(o)].filter(Boolean);
@@ -287,23 +292,47 @@ const avoidText = list => !list?.length ? null : list.map(v => v.kind === 'picku
 // of the inventory tiles to light up (the quest's item, and its pack page)
 export async function helperPayload() {
   const byFile = new Map((await loadQuests()).map(q => [q.file, q]));
-  return list.filter(e => e.guide && byFile.has(e.file)).map(entry => {
-    const q = byFile.get(entry.file), g = entry.guide, o = g[0], pr = questProgress(q, g);
-    const j = latestJournal(entry);
-    const sp = o ? signpost(o) : j?.lastPlace?.loc != null ? { town: data.locs.name[j.lastPlace.loc], place: j.lastPlace.building?.name || null } : null;
-    const tile = o?.inv?.where && ['drop', 'use'].includes(o.kind) ? o.inv : null;
-    return {
-      file: entry.file, title: q.title || q.file, daysLeft: entry.daysLeft ?? null, step: [pr.step, pr.total],
-      now: !o ? 'Follow your journal: the guide cannot tell the next step'
-        : o.kind === 'drop' && o.inv?.name ? `Drop “${o.inv.name}” inside ${o.building?.name || 'the place'}` : sayAction(o),
-      where: sp ? [sp.town, sp.place].filter(Boolean).join(' › ') : null,
-      steps: o ? helperSteps(o) : [],
-      avoid: o ? avoidText(o.avoid) : null,
-      then: g[1] ? sayAction(g[1]) : null,
-      journal: j?.text || null,
-      tiles: tile ? [tile.name] : [], page: tile?.page || null,
-    };
-  });
+  return list.filter(e => e.guide && byFile.has(e.file)).map(entry => helperFor(byFile.get(entry.file), entry));
+}
+// a quest running out of time: few days left, or fewer than the trip to the step's town takes (null when there is time)
+export function deadline(daysLeft, travelDays, reckless = false) {
+  if (daysLeft == null) return null;
+  const n = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  if (travelDays != null && travelDays > 2 * daysLeft) return `Probably too late: ${n(daysLeft, 'day')} left, and the trip there takes about ${n(travelDays, 'day')}. The quest fails when the time runs out.`;
+  if (travelDays != null && travelDays > daysLeft) return `Hurry: ${n(daysLeft, 'day')} left, but the trip there takes about ${n(travelDays, 'day')}.${reckless ? '' : ' Pick Reckless on the travel map to get there sooner.'}`;
+  if (travelDays != null && travelDays === daysLeft) return `Go now: ${n(daysLeft, 'day')} left, and the trip there takes about that long.`;
+  if (daysLeft <= 2) return `Only ${n(daysLeft, 'day')} left: do this quest first.`;
+  return null;
+}
+// a step in one short line, for the panel's headline and its Then
+function shortAction(o) {
+  const sp = signpost(o), place = sp ? sp.place || sp.town : null;
+  if (o.kind === 'drop') return `Drop ${o.inv?.name ? `“${o.inv.name}”` : thing(o.item)} inside ${o.building?.name || place || 'the place'}`;
+  if (o.kind === 'go') return `Go to ${place || 'the place in your journal'}${o.hours ? ` between ${clockTime(o.hours[0])} and ${clockTime(o.hours[1])}` : ''}`;
+  if (o.kind === 'wait') return `Wait${o.days ? ` about ${plural(o.days, 'day')}` : ''}: the quest goes on by itself`;
+  if (o.kind === 'reward' && o.automatic) return 'The reward comes by itself';
+  return sayAction(o);
+}
+export function helperFor(q, entry, here = state.here) {
+  const g = entry.guide, o = g[0], pr = questProgress(q, g);
+  const j = latestJournal(entry);
+  const sp = o?.schedule ? { town: data.locs.name[o.schedule.find(m => m.loc != null)?.loc] || null, place: 'where it is at this hour' } : o ? signpost(o) : j?.lastPlace?.loc != null ? { town: data.locs.name[j.lastPlace.loc], place: j.lastPlace.building?.name || null } : null;
+  const tile = o?.inv?.where && ['drop', 'use'].includes(o.kind) ? o.inv : null;
+  // the trip to the step's town from where the save was made, against the days left (the deadline warning)
+  const to = o?.loc ?? j?.lastPlace?.loc;
+  const trip = to != null && here >= 0 && to !== here && entry.daysLeft != null ? travelBetween(here, to, state.opts) : null;
+  const travelDays = trip ? Math.max(1, Math.ceil(trip.minutes / 1440)) : null;
+  return {
+    file: entry.file, title: q.title || q.file, daysLeft: entry.daysLeft ?? null, step: [pr.step, pr.total],
+    travelDays, warn: deadline(entry.daysLeft ?? null, travelDays, state.opts.pace === 'reckless'),
+    now: !o ? 'Follow your journal: the guide cannot tell the next step' : shortAction(o),
+    where: sp ? [sp.town, sp.place].filter(Boolean).join(' › ') : null,
+    steps: o ? helperSteps(o) : [],
+    avoid: o ? avoidText(o.avoid) : null,
+    then: g[1] ? shortAction(g[1]) : null,
+    journal: j?.text || null,
+    tiles: tile ? [tile.name] : [], page: tile?.page || null,
+  };
 }
 // the things not to do (questNow avoid): a line of its own under NOW
 function avoidLine(list) {
@@ -349,6 +378,7 @@ function nowCard(q, entry) {
       el('button', { class: 'dg-help', title: 'Copy this quest\'s details, to paste into a bug report', onclick: e => copyForHelp(e.currentTarget, q, entry) }, 'Copy for help'),
       el('button', { class: 'dg-done', title: 'Done: remove this quest', 'aria-label': 'Done, remove this quest', onclick: remove }, '✓')));
   const j = latestJournal(entry), jp = j?.lastPlace;
+  const warn = helperFor(q, entry).warn;
   // nothing the script points to: the place the journal names, else the journal's own words
   const body = !g.length
     ? (jp?.loc != null
@@ -358,7 +388,8 @@ function nowCard(q, entry) {
   const older = (entry.journal || []).filter(e => e !== j);
   // a quest that just arrived from the game glows for a couple of minutes
   const fresh = entry.fresh && Date.now() - entry.fresh < 120000 && list.length > 1;
-  return el('div', { class: 'dg-card dg-mine dg-mine-now' + (fresh ? ' dg-fresh' : '') }, head, body, j ? journalLine(j) : null,
+  if (warn) head.querySelector('.dg-tag').classList.add('dg-tag-warn');
+  return el('div', { class: 'dg-card dg-mine dg-mine-now' + (fresh ? ' dg-fresh' : '') + (warn ? ' dg-late' : '') }, head, warn ? el('div', { class: 'dg-warn', text: warn }) : null, body, j ? journalLine(j) : null,
     el('details', { class: 'dg-more' }, el('summary', { text: 'details' }),
       older.length ? el('div', { class: 'dg-jolder' }, el('b', { text: 'Earlier in your journal' }), ...older.map(e => el('p', { text: `“${e.text}”` }))) : null,
       ...legacyParts(q, entry)));

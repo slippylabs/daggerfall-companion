@@ -27,7 +27,7 @@ for (const f of files) {
   if (!o || !(o.npc || o.foe || o.item || o.place || o.clock || o.automatic)) bad.push(`${f} ${sd.displayName || ''}: ${show(o)}`);
 }
 if (process.argv.includes('-v')) bad.forEach(b => console.log('   ', b));
-check((compiled - bad.length) / compiled >= 0.95, `startup NOW with a target for ${compiled - bad.length}/${compiled} quests`);
+check((compiled - bad.length) / compiled >= 0.975, `startup NOW with a target for ${compiled - bad.length}/${compiled} quests`);
 
 // Play-through: doing NOW, again and again, must reach the quest's goal (the guide never leads nowhere)
 {
@@ -63,7 +63,7 @@ check((compiled - bad.length) / compiled >= 0.95, `startup NOW with a target for
     else stuck.push(`${f} ${sd.displayName || ''}: stuck after ${steps} steps at ${last}`);
   }
   if (process.argv.includes('-v')) stuck.forEach(b => console.log('   ', b));
-  check(ok / n >= 0.98, `following NOW finishes ${ok}/${n} quests`);
+  check(ok / n >= 0.985, `following NOW finishes ${ok}/${n} quests`);
   if (process.argv.includes('-j')) jt.list.forEach(b => console.log('   ', b));
   check(jt.agree / jt.named >= JOURNAL_AGREE, `NOW goes where the journal's latest entry points: ${jt.agree}/${jt.named} steps`);
 }

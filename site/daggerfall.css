@@ -335,6 +335,8 @@ code { color: var(--gold); }
 .dg-jline.dg-open { display: block; }
 .dg-jline-label { font-family: var(--caps); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--gold); }
 .dg-avoid { margin: 6px 0 0 30px; padding: 4px 8px; border-left: 3px solid #8c1c13; background: rgba(140, 28, 19, 0.1); color: var(--ink); font-size: 0.95rem; }
+.dg-warn { margin: 8px 0 4px; padding: 6px 10px; border-radius: 4px; background: #8c1c13; color: #fff; font-weight: bold; }
+.dg-card.dg-late { border-color: #8c1c13; }
 .dg-avoid-label { font-weight: 700; color: #8c1c13; }
 .dg-jnote { margin: 6px 0 0 30px; padding: 4px 8px; border: 1px solid #b07a1e; background: rgba(176, 122, 30, 0.15); color: var(--ink); font-size: 0.95rem; }
 .dg-jnote .dg-chip-btn { margin-left: 6px; }

@@ -26,6 +26,8 @@ export function compile(file, uid = 1) {
     // headless parsing sets up no homes: a real save gives every non-fixed person one (`_name_home_`)
     for (const r of sd.resources) {
       const p = r.resourceSpecific;
+      // ...and the quest's items carry the quest's own uid, as the player's inventory holds them
+      if (r.type === 'Item' && p?.item) p.item.questUID = uid;
       if (r.type === 'Person' && p && !p.isIndividualNPC && !p.homePlaceSymbol) p.homePlaceSymbol = { original: `${sym(r.symbol).replace(/_$/, '')}_home_` };
     }
     return sd;
@@ -46,7 +48,7 @@ export function run(sd, s, pick = 0, force = false) {
     if (a.type === 'StartTask') for (const ts of x.taskSymbols || [x.taskSymbol]) run(sd, sym(ts), pick);
     // the player's quest items (sd._held), as the game's inventory would hold them
     sd._held ||= new Set();
-    if (a.type === 'GetItem') { sd._held.add(sym(x.itemSymbol)); haveWatchers(sd, sym(x.itemSymbol), pick); }
+    if (a.type === 'GetItem' || (a.type === 'GivePc' && !x.isNothing)) { sd._held.add(sym(x.itemSymbol)); haveWatchers(sd, sym(x.itemSymbol), pick); }
     if (a.type === 'TakeItem' || a.type === 'DropAsQuestItem') sd._held.delete(sym(x.itemSymbol));
     if (a.type === 'HaveItem' && sd._held.has(sym(x.targetItem))) run(sd, sym(x.targetTask), pick);
     if (a.type === 'Prompt') run(sd, sym(x.yesTaskSymbol), pick);   // the player answers Yes
@@ -97,6 +99,9 @@ export function perform(sd, o) {
   if (o.kind === 'wait') run(sd, o.clock);   // the time runs out
   if (o.kind === 'kill' && !o.injure) kill(sd, o.foe, o.count || 1);
   sd._held ||= new Set();
+  // the item the foe carried, taken from its body
+  const loot = o.loot || (o.kind === 'loot' ? o.item : null);
+  if (loot) { sd._held.add(loot); haveWatchers(sd, loot); }
   if (o.kind === 'pickup') { sd._held.add(o.item); haveWatchers(sd, o.item); }
   if (o.kind === 'drop') sd._held.delete(o.item);
   // time passes between errands: a `daily from` task is on only in its hours (an always-on trigger, so it switches off

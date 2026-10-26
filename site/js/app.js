@@ -1,12 +1,12 @@
 // Entry point: load the data, wire the shared "I am in" header and the tabs.
-import { data, loadCore, regionName, typeWord } from './data.js?v=22';
-import { state, setHere, setOpts, onChange, registerTabs } from './state.js?v=22';
-import { autocomplete } from './ui.js?v=22';
-import { initMap } from './map.js?v=22';
-import { initJournal } from './journal.js?v=22';
-import { initQuests, setQuestTabs } from './quests.js?v=22';
-import { initTowns, townsShown } from './towns.js?v=22';
-import { initMyQuests, renderMine, loadSnapshot, hasQuests, helperPayload } from './myquests.js?v=22';
+import { data, loadCore, regionName, typeWord } from './data.js?v=23';
+import { state, setHere, setOpts, onChange, registerTabs } from './state.js?v=23';
+import { autocomplete } from './ui.js?v=23';
+import { initMap } from './map.js?v=23';
+import { initJournal } from './journal.js?v=23';
+import { initQuests, setQuestTabs } from './quests.js?v=23';
+import { initTowns, townsShown } from './towns.js?v=23';
+import { initMyQuests, renderMine, loadSnapshot, hasQuests, helperPayload } from './myquests.js?v=23';
 
 const $ = id => document.getElementById(id);
 const TABS = ['journal', 'map', 'quests', 'towns', 'mine'];

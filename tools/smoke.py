@@ -449,8 +449,9 @@ def run_helper(base):
         page = ctx.new_page()
         page.goto(dfo + '/')
         page.evaluate("([s]) => { localStorage.setItem('dagger.save.0', s); localStorage.setItem('dagger.saveinfo.0', JSON.stringify({characterName: 'Slippy', saveName: 'QuickSave', dateAndTime: {realTime: 5, gameTime: 523530}})); }", [POSTMAN])
-        with page.expect_popup():
+        with page.expect_popup() as pop:
             page.evaluate(code)
+        guide_page = pop.value
         page.wait_for_function('window.__dgHelper && window.__dgHelper.state().quests.length === 1', timeout=20000)
         panel = page.locator('#dg-helper .p').inner_text()
         check('The Postman' in panel and 'Letter: Lysausa Greenhouse' in panel and "The Queen's Helm" in panel and 'F6' in panel,
@@ -465,6 +466,19 @@ def run_helper(base):
         check(lit == [False, False, True, False] and page.locator('.packtab.dg-hl').count() == 0 and 'glowing gold' in page.locator('#dg-helper .p').inner_text(),
               f'[helper] on Misc: only the quest letter glows among identical parchments ({lit})')
         page.screenshot(path=str(SHOTS / 'helper.png'))
+        # the deadline: the guide's warning turns the panel red, and another quest running out is one click away
+        mine = page.evaluate('window.__dgHelper.state().quests[0]')
+        late = [{**mine, 'daysLeft': 1, 'warn': 'Hurry: 1 day left, but the trip there takes about 3 days.'},
+                {**mine, 'file': 'OTHER', 'title': 'Another Job', 'daysLeft': 2, 'warn': 'Only 2 days left: do this quest first.'}]
+        guide_page.evaluate("([q, o]) => opener.postMessage({ type: 'dg-helper', quests: q, at: Date.now() }, o)", [late, dfo])
+        page.wait_for_function("document.querySelector('#dg-helper').shadowRoot.querySelector('.warn')")
+        panel = page.locator('#dg-helper .p').inner_text()
+        red = page.evaluate("document.querySelector('#dg-helper').shadowRoot.querySelector('.p').classList.contains('urgent')")
+        check(red and 'Hurry: 1 day left' in panel and 'Also running out: Another Job' in panel,
+              f'[helper] a quest running out of time: red panel, the warning, the other urgent quest ({panel.splitlines()[0][:40]})')
+        page.screenshot(path=str(SHOTS / 'helper-late.png'))
+        page.locator('#dg-helper .also').click()
+        check(page.locator('#dg-helper .t').inner_text().startswith('\u26a0 Another Job'), '[helper] clicking it switches to that quest')
         page.locator('#dg-helper .x').click()
         check(not page.locator('#dg-helper').is_visible(), '[helper] × closes the panel')
         page.evaluate(code)   # the second click: the same guide window, no popup

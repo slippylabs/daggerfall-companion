@@ -1,8 +1,8 @@
 // Map tab: the game's own travel-map art. World view = TRAV0I00 (click a region);
 // region view = its FMAP page(s) with every location dot placed by the game's own law.
-import { data, regionName, typeWord, searchLocations, travelBetween, loadRoads } from './data.js?v=22';
-import { el, fill, autocomplete, locationCard } from './ui.js?v=22';
-import { state, registerMap, onChange } from './state.js?v=22';
+import { data, regionName, typeWord, searchLocations, travelBetween, loadRoads } from './data.js?v=23';
+import { el, fill, autocomplete, locationCard } from './ui.js?v=23';
+import { state, registerMap, onChange } from './state.js?v=23';
 
 const $ = id => document.getElementById(id);
 const canvas = $('map-canvas'), ctx = canvas.getContext('2d');

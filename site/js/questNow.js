@@ -7,7 +7,9 @@
 // order; the first is NOW, the next THEN.
 //
 // questNow(sq, items) -> { objectives: [{kind, npc, item, foe, place, payer, later, alternatives}], complete }
-//   kind: 'go' | 'pickup' | 'drop' | 'use' | 'cast' | 'kill' | 'talk' | 'bring' | 'wait' | 'reward';
+//   kind: 'go' | 'pickup' | 'drop' | 'use' | 'cast' | 'kill' | 'loot' | 'talk' | 'bring' | 'wait' | 'reward';
+//   schedule: on a kill, [{place, hours}] where the script moves the foe by the hour; comes: it appears near the player;
+//   loot: on a kill, the quest item the foe carries (take it from the body); kind 'loot': the foe is dead, search it;
 //   hours: [from, to] seconds of the game day when a 'go' counts (the script watches only then);
 //   clock: for 'wait', the timer whose running out goes on with the quest;
 //   npc/item/foe/place are resource symbols, spell a SPELLS.STD index; injure: wound it, do not kill it;
@@ -18,7 +20,7 @@
 //   avoid: player actions that would spoil the quest ([{kind, item|foe|npc}]: don't pick up the wand).
 //   items: the player's quest items, [{questUID, symbol}] (from the save's inventories)
 
-import { parseTemplate } from './questText.js?v=22';
+import { parseTemplate } from './questText.js?v=23';
 
 const sym = s => (s && typeof s === 'object' ? s.original : s) || null;
 
@@ -52,9 +54,20 @@ export function questNow(sq, items = []) {
   const foePlace = s => placedAt(['PlaceFoe'], 'foeSymbol', s);
   const npcPlace = s => placedAt(['PlaceNpc'], 'npcSymbol', s);
   const itemPlace = s => placedAt(['PlaceItem'], 'itemSymbol', s);
+  // `give item _x_ to _foe_` puts the item on the foe, not in the player's pack: it is taken from the body
+  const toFoe = x => res.get(sym(spec(x.a).targetSymbol))?.type === 'Foe';
   const gotItem = s => items.some(i => i.questUID === sq.uid && (i.symbol === s || `_${i.symbol}_` === s))
-    || (placing(['GetItem', 'GiveItem'], 'itemSymbol', s).some(ran)
+    || (placing(['GetItem', 'GiveItem', 'GivePc'], 'itemSymbol', s).some(x => ran(x) && !(x.a.type === 'GiveItem' && toFoe(x)))
       && !placing(['TakeItem', 'DropAsQuestItem'], 'itemSymbol', s).some(ran));
+  // the foe that carries a quest item the player has yet to take
+  const carrier = s => { if (gotItem(s)) return null; const x = placing(['GiveItem'], 'itemSymbol', s).find(y => ran(y) && toFoe(y)); return x ? sym(spec(x.a).targetSymbol) : null; };
+  // kill the carrier and take the item from its body; already dead: search the body
+  const lootStep = s => {
+    const f = carrier(s);
+    if (!f) return null;
+    const dead = (res.get(f)?.resourceSpecific?.killCount || 0) > 0;
+    return dead ? { kind: 'loot', foe: f, item: s, place: foePlace(f) } : { kind: 'kill', foe: f, count: 1, loot: s, place: foePlace(f) };
+  };
   const live = o => {
     if (o.kind === 'kill') {
       // (a Foe's spawnCount is how many the script asks for, not how many stand in the world)
@@ -75,9 +88,10 @@ export function questNow(sq, items = []) {
   const placer = o => {
     const list = o.kind === 'kill' ? placing(['PlaceFoe', 'CreateFoe'], 'foeSymbol', o.foe)
       : o.kind === 'pickup' ? placing(['PlaceItem'], 'itemSymbol', o.item)
-        : (o.kind === 'bring' || o.kind === 'drop') && !gotItem(o.item) ? placing(['GetItem', 'GiveItem', 'PlaceItem'], 'itemSymbol', o.item)
+        : (o.kind === 'bring' || o.kind === 'drop') && !gotItem(o.item) ? placing(['GetItem', 'GiveItem', 'GivePc', 'PlaceItem'], 'itemSymbol', o.item)
           : o.npc ? placing(['PlaceNpc', 'CreateNpc'], 'npcSymbol', o.npc) : [];
-    return list.find(x => !ran(x))?.task || null;
+    // (a `give pc` of the very item is mostly the paying task handing it back: the last way to get it, not the first)
+    return list.filter(x => !ran(x)).sort((a, b) => (a.a.type === 'GivePc') - (b.a.type === 'GivePc'))[0]?.task || null;
   };
   const objective = a => {
     const x = spec(a);
@@ -123,8 +137,14 @@ export function questNow(sq, items = []) {
   // a `when` line that can no longer hold: one of its `and` terms is dead
   const lineDead = (a, depth = 0) => (spec(a).evaluations || []).some(e => !/Not$/.test(e.op) && !/^or/.test(e.op) && deadTask(e.task, depth));
   // the open objectives one `when` line waits on, added to out
-  function whenNeed(a, depth, out) {
-    for (const e of spec(a).evaluations || []) {
+  // (a term a guard undoes unless this task is done first - `when _click_ and not _ready_` / `clear _click_` - counts
+  // only once the other terms are done: Helseth is talked to after the day's wait, not before)
+  const undone = (x, owner) => [...tasks.values()].some(g => (g.actions || []).some(c => c.type === 'ClearTask' && (spec(c).taskSymbols || []).map(sym).includes(x))
+    && conds(g).some(w => w.type === 'WhenTask' && (spec(w).evaluations || []).some(e => e.task === owner && /Not$/.test(e.op))));
+  function whenNeed(a, depth, out, owner = null) {
+    let ev = spec(a).evaluations || [];
+    if (owner && !ev.some(e => /^or/.test(e.op))) ev = [...ev].sort((x, y) => undone(x.task, owner) - undone(y.task, owner));
+    for (const e of ev) {
       if (/Not$/.test(e.op)) continue;
       const sub = need(e.task, depth + 1);
       if (/^or/.test(e.op) && out.length && sub.length) out[out.length - 1] = [...out[out.length - 1], ...sub.flat()];
@@ -173,14 +193,14 @@ export function questNow(sq, items = []) {
         let best = Infinity;
         for (const a of pool.length ? pool : whens) {
           const before = new Set(seen), trial = [];
-          whenNeed(a, depth, trial);
+          whenNeed(a, depth, trial, s);
           seen.clear(); before.forEach(x => seen.add(x));
           if (trial.length < best) { best = trial.length; when = a; }
         }
       }
       for (const a of cs) {
         if (a.type === 'WhenTask') {
-          if (a === when) whenNeed(a, depth, out);
+          if (a === when) whenNeed(a, depth, out, s);
         } else if (PLAYER.has(a.type)) {
           const o = objective(a);
           if (o) alts.push(o);
@@ -193,7 +213,12 @@ export function questNow(sq, items = []) {
         const hidden = ready.map(where).find(pl => pl && unrevealed(pl));
         if (hidden) out.push(...need(sym(unrevealed(hidden).symbol), depth + 1));
         if (ready.length) out.push(ready.map(o => ({ ...o, place: where(o) })));
-        else if (alts.some(o => (o.kind === 'bring' || o.kind === 'drop') && itemPlace(o.item))) {
+        else if (alts.some(o => (o.kind === 'bring' || o.kind === 'drop') && carrier(o.item))) {
+          // the item to deliver is on a foe: kill it and take the item from its body first
+          const o = alts.find(b => (b.kind === 'bring' || b.kind === 'drop') && carrier(b.item));
+          out.push([lootStep(o.item)]);
+          out.push([{ ...o, place: where(o) }]);
+        } else if (alts.some(o => (o.kind === 'bring' || o.kind === 'drop') && itemPlace(o.item))) {
           // the item to deliver (or to leave somewhere) lies where the quest put it: pick it up first
           const o = alts.find(b => (b.kind === 'bring' || b.kind === 'drop') && itemPlace(b.item));
           const pl = itemPlace(o.item);
@@ -205,6 +230,9 @@ export function questNow(sq, items = []) {
           const first = alts.find(o => placer(o)) || alts[0];
           const p = placer(first);
           if (p) out.push(...need(sym(p.symbol), depth + 1));
+          // that task hands the item to a foe (`injured _boar_` ... `give item _tusk_ to _boar_`): then it is killed for it
+          const gift = p && (p.actions || []).find(a => a.type === 'GiveItem' && sym(spec(a).itemSymbol) === first.item && res.get(sym(spec(a).targetSymbol))?.type === 'Foe');
+          if (gift) { const f = sym(spec(gift).targetSymbol); out.push([{ kind: 'kill', foe: f, count: 1, loot: first.item, place: foePlace(f) }]); }
           out.push([{ ...first, place: where(first), later: true }]);
         }
       }
@@ -228,6 +256,13 @@ export function questNow(sq, items = []) {
           const daily = conds(task).find(c => c.type === 'DailyFrom');
           if (daily && !task.triggered) watch.hours = [spec(daily).minDailySeconds || 0, spec(daily).maxDailySeconds ?? 86400];
           if (!task.triggered) out.push(...need(sym(task.symbol), depth + 1));
+          // an item to use has to be in the pack first: taken from a foe, picked up, or handed over by a task still to come
+          if (watch.kind === 'use' && !gotItem(watch.item)) {
+            const pl = itemPlace(watch.item), from = placer({ kind: 'drop', item: watch.item });
+            if (carrier(watch.item)) out.push([lootStep(watch.item)]);
+            else if (pl) out.push([{ kind: 'pickup', item: watch.item, place: pl }]);
+            else if (from) out.push(...need(sym(from.symbol), depth + 1));
+          }
           out.push([watch]);
           continue;
         }
@@ -237,7 +272,8 @@ export function questNow(sq, items = []) {
           // (it only watches once its own task has started: Open a Chest's `cast Open spell do` first)
           if (!task.triggered) out.push(...need(sym(task.symbol), depth + 1));
           if (gotItem(it)) continue;
-          if (itemPlace(it)) out.push([{ kind: 'pickup', item: it, place: itemPlace(it) }]);
+          if (carrier(it)) out.push([lootStep(it)]);
+          else if (itemPlace(it)) out.push([{ kind: 'pickup', item: it, place: itemPlace(it) }]);
           else starters.push(...all.filter(y => y.a.type === 'GetItem' && sym(spec(y.a).itemSymbol) === it && !ran(y)));
           continue;
         }
@@ -276,7 +312,12 @@ export function questNow(sq, items = []) {
   // one of two tasks, by whether the map was picked)
   const live2 = open.filter(t => !deadTask(sym(t.symbol)));
   const goal = live2.find(t => has(t, 'GivePc') && conds(t).length) || live2.find(t => has(t, 'GivePc'))
-    || live2.find(t => has(t, 'EndQuest') && conds(t).some(a => PLAYER.has(a.type) || a.type === 'WhenTask'));
+    || live2.find(t => has(t, 'EndQuest') && conds(t).some(a => PLAYER.has(a.type) || a.type === 'WhenTask'))
+    // no pay and no ending of its own: the player's deed that starts the clock whose running out ends the quest well
+    // (The Impostor: the shaman killed, `start timer _extratime_`, and that timer's task ends it)
+    || live2.find(t => conds(t).some(a => PLAYER.has(a.type) || a.type === 'WhenTask') && (t.actions || []).some(a => a.type === 'StartStopTimer'
+      && spec(a).isStartTimer !== false && has(tasks.get(sym(spec(a).targetSymbol)) || {}, 'EndQuest') && sym(spec(a).targetSymbol) !== sym(t.symbol)
+      && all.filter(x => x.a.type === 'StartStopTimer' && sym(spec(x.a).targetSymbol) === sym(spec(a).targetSymbol)).every(x => x.task === t)));
   const journal = journalPlace(sq);
   if (!goal) return { objectives: [], complete: false, goal: null, journal };
   const pays = has(goal, 'GivePc');
@@ -295,7 +336,10 @@ export function questNow(sq, items = []) {
   const payerNpcs = new Set(pays ? direct.filter(a => a.type === 'ClickedNpc' || a.type === 'TotingItemAndClickedNpc').map(a => sym(spec(a).npcSymbol)) : []);
   const objectives = [];
   // of several people the paying task waits on (the lady to rescue, then the quest giver), the last talk is the reward
-  const lastTalk = groups.map(g => g[0]).findLastIndex(o => o.kind === 'talk' && payerNpcs.has(o.npc));
+  // (but when the pay comes with a delivery to them, a talk to them is a step on the way: Queen Aubk-i is asked for the
+  // job first, then brought the letters)
+  const payBring = groups.some(g => g[0].kind === 'bring' && payerNpcs.has(g[0].npc));
+  const lastTalk = payBring ? -1 : groups.map(g => g[0]).findLastIndex(o => o.kind === 'talk' && payerNpcs.has(o.npc));
   let rewardObj = null;
   groups.forEach((g, i) => {
     const o = { ...g[0], alternatives: g.slice(1) };
@@ -314,9 +358,34 @@ export function questNow(sq, items = []) {
     if (!t || t.triggered || timers.has(f)) continue;
     for (const a of conds(t)) if (PLAYER.has(a.type)) { const o = objective(a); if (o && !avoid.some(v => v.kind === o.kind && (v.item || v.foe || v.npc) === (o.item || o.foe || o.npc))) avoid.push(o); }
   }
+  // a wound the goal does not forbid killing for is just the first blow: "spare" only when killing spoils the quest,
+  // and a kill of the same foe in the list does the wound too (the boar's tusk: wound it, kill it, take the tusk)
+  for (const o of objectives) if (o.injure && avoid.some(v => v.kind === 'kill' && !v.injure && v.foe === o.foe)) o.spare = true;
+  for (let i = 0; i < objectives.length; i++) {
+    const o = objectives[i];
+    if (o.kind !== 'kill' || o.spare) continue;
+    for (let j = objectives.length - 1; j > i; j--) {
+      const p = objectives[j];
+      if (p.kind !== 'kill' || p.foe !== o.foe || p.spare) continue;
+      if (p.loot) o.loot = p.loot;
+      if (!p.injure) { o.injure = false; o.count = Math.max(o.count || 1, p.count || 1); }
+      objectives.splice(j, 1);
+    }
+  }
+  // a foe with no place of its own yet: one the script moves by the hour (the thief at the house by night, the tavern
+  // by evening) gets its timetable; one the script makes (`create foe`) comes to the player wherever they are
+  for (const o of objectives) {
+    if (o.kind !== 'kill' || o.place) continue;
+    const moves = placing(['PlaceFoe'], 'foeSymbol', o.foe).map(({ task, a }) => {
+      const d = conds(task).find(c => c.type === 'DailyFrom');
+      return d ? { place: sym(spec(a).placeSymbol), hours: [spec(d).minDailySeconds || 0, spec(d).maxDailySeconds ?? 86400] } : null;
+    });
+    if (moves.length > 1 && moves.every(Boolean)) o.schedule = moves.sort((a, b) => a.hours[0] - b.hours[0]);
+    else if (placing(['CreateFoe'], 'foeSymbol', o.foe).length) o.comes = true;
+  }
   // a foe that spawns, an item to use or a spell to cast where the script never says: the journal's latest entry
   // names the place (the bats are in the house, the zombies in the graveyard)
   const o0 = objectives[0];
-  if (o0 && !o0.place && journal && ['kill', 'use', 'cast', 'pickup', 'drop'].includes(o0.kind)) Object.assign(o0, { place: journal, fromJournal: true });
+  if (o0 && !o0.place && journal && ['kill', 'loot', 'use', 'cast', 'pickup', 'drop'].includes(o0.kind)) Object.assign(o0, { place: journal, fromJournal: true });
   return { objectives, complete: false, goal: sym(goal.symbol), pays, journal, avoid };
 }
