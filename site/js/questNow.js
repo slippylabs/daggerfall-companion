@@ -18,7 +18,7 @@
 //   avoid: player actions that would spoil the quest ([{kind, item|foe|npc}]: don't pick up the wand).
 //   items: the player's quest items, [{questUID, symbol}] (from the save's inventories)
 
-import { parseTemplate } from './questText.js?v=19';
+import { parseTemplate } from './questText.js?v=20';
 
 const sym = s => (s && typeof s === 'object' ? s.original : s) || null;
 

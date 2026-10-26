@@ -246,7 +246,7 @@ def run(base, width, height, mobile):
         page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-help').click()
         page.wait_for_function('window.__copied')
         copied = page.evaluate('window.__copied')
-        check('Quest: The Delivery Boy (A0C00Y14)' in copied and 'NOW: Give the book' in copied and '"goal"' in copied and '_pickuplocal_ | Person | Bedoryan Kingwing' in copied,
+        check('Quest: The Delivery Boy (A0C00Y14)' in copied and 'NOW: Give the book' in copied and '"goal"' in copied and '_pickuplocal_ | Person | Bedoryan Kingwing' in copied and '_book_ | pack | Book' in copied,
               f'[{tag}] Copy for help copies the card and the quest state ({len(copied)} chars)')
         page.screenshot(path=str(SHOTS / f'save_{tag}.png'), full_page=True)
         # NOW's Town map: the recipient's house circled

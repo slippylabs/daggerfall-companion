@@ -1,8 +1,8 @@
 // Quests tab: every quest script as a walkthrough - what it asks, the time limit, and who pays.
-import { loadQuests, normalise } from './data.js?v=19';
-import { el, fill } from './ui.js?v=19';
-import { templateSegments, stepText, rewardGivers, questProgress } from './questText.js?v=19';
-import { trackQuest, isTracked } from './myquests.js?v=19';
+import { loadQuests, normalise } from './data.js?v=20';
+import { el, fill } from './ui.js?v=20';
+import { templateSegments, stepText, rewardGivers, questProgress } from './questText.js?v=20';
+import { trackQuest, isTracked } from './myquests.js?v=20';
 
 const $ = id => document.getElementById(id);
 let quests = null, selected = null, tabs = null;

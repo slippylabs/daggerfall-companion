@@ -3,9 +3,9 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=19';
-import { questNow } from './questNow.js?v=19';
-import { parseTemplate, templateSegments } from './questText.js?v=19';
+import { data } from './data.js?v=20';
+import { questNow } from './questNow.js?v=20';
+import { parseTemplate, templateSegments } from './questText.js?v=20';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -169,7 +169,10 @@ function questDebug(sq, snap) {
     done: (sq.tasks || []).filter(t => t.triggered).map(t => s(t.symbol)),
     dropped: (sq.tasks || []).filter(t => t.dropped).map(t => s(t.symbol)),
     log: (sq.activeLogMessages || []).map(e => `${e.stepID}:${e.messageID}`),
-    held: questItems(snap).filter(i => i.questUID === sq.uid).map(i => i.symbol),
+    // each of the quest's items the character holds, and where: the pack, the wagon, the materials bag, a repairer's counter
+    held: [['items', 'pack'], ['wagonItems', 'wagon'], ['bagItems', 'materials bag'], ['otherItems', 'at a repairer']]
+      .flatMap(([k, where]) => (snap[k] || []).filter(it => it?.questItem && it.questUID === sq.uid)
+        .map(it => `${it.questSymbol?.original || it.questSymbol?.name} | ${where} | ${it.shortName || it.name || '?'}${it.equipSlot != null && it.equipSlot >= 0 ? ' | worn' : ''}`)),
     res: (sq.resources || []).map(x => {
       const p = x.resourceSpecific || {};
       return [s(x.symbol), x.type, p.displayName || p.typeName || p.item?.name || where(p.siteDetails) || '',
