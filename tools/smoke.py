@@ -241,6 +241,9 @@ def run(base, width, height, mobile):
         # the player's own journal, on the card: the game's words with the save's names
         jl = page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-jline').inner_text()
         check('Journal:' in jl and 'Bedoryan Kingwing' in jl and 'Gondywyr Hearthhouse' in jl and '_' not in jl, f'[{tag}] the card shows the journal entry ({jl[:60]}…)')
+        # the item the step needs, as the inventory shows it: name, page, where, the clicks
+        inv = page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-inv').inner_text()
+        check('Book' in inv and 'In your pack' in inv and 'page' in inv, f'[{tag}] the card shows the book as the inventory has it ({inv.splitlines()[1][:60] if len(inv.splitlines()) > 1 else inv[:60]})')
         # Copy for help: the card and the quest's state as text
         page.evaluate("window.__copied = null; navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); }")
         page.locator('#mine-list .dg-mine-now:has-text("The Delivery Boy") .dg-help').click()

@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=20';
-import { el, fill } from './ui.js?v=20';
-import { state, onChange, showOnMap, setHere } from './state.js?v=20';
-import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=20';
-import { showQuest } from './quests.js?v=20';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=20';
-import { planRoute } from './route.js?v=20';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=20';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=21';
+import { el, fill } from './ui.js?v=21';
+import { state, onChange, showOnMap, setHere } from './state.js?v=21';
+import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=21';
+import { showQuest } from './quests.js?v=21';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=21';
+import { planRoute } from './route.js?v=21';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=21';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -175,7 +175,7 @@ function sayAction(o, q) {
     case 'bring': return `Give ${thing(o.item)} to ${who}${o.payer ? ', who pays your reward' : ''}`;
     case 'kill': return o.injure ? `Wound the ${o.who || 'foe'}, but do not kill it` : `Kill ${o.count > 1 ? plural(o.count, o.who || 'foe') : `the ${o.who || 'foe'}`}`;
     case 'pickup': return `Pick up ${thing(o.item)}`;
-    case 'drop': return `Go inside${o.building ? ` ${o.building.name}` : ''} and drop ${thing(o.item)} there: open your inventory and move it from your pack onto the ground (not the wagon), then leave it. It only counts inside`;
+    case 'drop': return `Go inside${o.building ? ` ${o.building.name}` : ''} and drop ${o.inv?.name ? `“${o.inv.name}”` : thing(o.item)} on the floor there, then leave it. It only counts inside`;
     case 'use': return `Use ${thing(o.item)} from your inventory`;
     case 'cast': return `Cast the spell ${o.spell}`;
     case 'go': return o.hours ? `Go there between ${clockTime(o.hours[0])} and ${clockTime(o.hours[1])} (game time): the quest only watches then` : 'Go there';
@@ -208,7 +208,7 @@ function cardText(q, entry) {
   const g = entry.guide || [], pr = questProgress(q, g);
   const line = o => { const sp = signpost(o); return `${sayAction(o, q)}${sp ? ` @ ${[sp.town, sp.place].filter(Boolean).join(' > ')}` : ''}`; };
   return [`Quest: ${q.title || q.file} (${q.file}), step ${pr.step} of ${pr.total}${entry.daysLeft != null ? `, ${entry.daysLeft} days left` : ''}`,
-    `NOW: ${g[0] ? line(g[0]) : '(nothing)'}`, g[1] ? `THEN: ${line(g[1])}` : null,
+    `NOW: ${g[0] ? line(g[0]) : '(nothing)'}`, g[0]?.inv ? `ITEM: ${g[0].inv.name} | ${g[0].inv.where || 'not held'} | ${g[0].inv.page} page` : null, g[1] ? `THEN: ${line(g[1])}` : null,
     ...(entry.journal || []).map(j => `Journal (step ${j.step}): ${j.text}`),
     `Guide v${document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/)?.[1] || '?'}`,
     '--- quest state ---', JSON.stringify(entry.debug || {}, null, 1)].filter(Boolean).join('\n');
@@ -237,6 +237,27 @@ function signpost(o) {
   }
   if (o.dungeon || o.spot) return { town, place: o.spot ? 'the marked spot inside' : null, part: o.dungeon ? 'dungeon' : null };
   return { town, place: null, part: null };
+}
+// the item a step needs, as the inventory shows it: its picture, its name, its page, and the clicks for the step
+function invBox(o) {
+  const v = o.inv;
+  if (!v?.name || !['drop', 'bring', 'use'].includes(o.kind)) return null;
+  const kept = v.where === 'pack' || !v.where ? 'your pack' : `your ${v.where}`;
+  const find = `Click the ${v.page} button (classic screen: the ${v.tab} tab), then click the tile named “${v.name}”${v.icon === 'letter' ? ', a flat brown sheet of paper' : ''}. The pack shows pictures only: the name appears when you click one`;
+  const steps = !v.where ? [`You don't have it any more. ${o.kind === 'drop' ? 'Look on the floor where you dropped it, or' : 'Check'} the step before this one`]
+    : [
+      ...(v.where !== 'pack' ? [`It is in ${kept}: move it into your pack first`] : []),
+      ...(o.kind === 'drop' ? [`Walk inside ${o.building?.name || 'the place'}`] : o.kind === 'bring' ? [`Find ${o.who || 'them'} and click them while you carry it`] : []),
+      ...(o.kind === 'bring' ? [] : ['Open your inventory (F6)', find]),
+      ...(o.kind === 'drop' ? ['Drag the tile out of the inventory window and let go: it lands on the floor', 'Close the inventory and leave it there. Do not pick it back up']
+        : o.kind === 'use' ? ['Click Use'] : []),
+    ];
+  return el('div', { class: 'dg-inv' },
+    el('div', { class: 'dg-inv-head' },
+      v.icon === 'letter' ? el('img', { class: 'dg-inv-icon', src: 'img/ui/item-letter.png', alt: '', width: 122, height: 38 }) : null,
+      el('div', {}, el('div', { class: 'dg-inv-name', text: v.name }),
+        el('div', { class: 'dg-inv-where', text: v.where ? `In ${kept} · ${v.page} page (classic: ${v.tab})${v.worn ? ' · worn' : ''}` : 'Not in your inventory' }))),
+    el('ol', { class: 'dg-inv-steps' }, steps.map(t => el('li', { text: t + '.' }))));
 }
 // the things not to do (questNow avoid): a line of its own under NOW
 function avoidLine(list) {
@@ -287,7 +308,7 @@ function nowCard(q, entry) {
     ? (jp?.loc != null
       ? nowBlock({ kind: 'go', loc: jp.loc, building: jp.building ? { key: jp.building.key, name: jp.building.name } : null, fromJournal: true }, q)
       : el('div', { class: 'dg-step-block dg-step-now' }, el('div', { class: 'dg-step-what', text: j ? 'Nothing the guide can point to: follow your journal.' : 'Nothing the guide can point to. Check the quest in your journal, or open details.' })))
-    : [nowBlock(g[0], q), avoidLine(g[0].avoid), journalNote(j, g[0]), g[1] ? thenLine(g[1], q) : null];
+    : [nowBlock(g[0], q), invBox(g[0]), avoidLine(g[0].avoid), journalNote(j, g[0]), g[1] ? thenLine(g[1], q) : null];
   const older = (entry.journal || []).filter(e => e !== j);
   // a quest that just arrived from the game glows for a couple of minutes
   const fresh = entry.fresh && Date.now() - entry.fresh < 120000 && list.length > 1;

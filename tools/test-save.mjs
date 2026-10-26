@@ -88,6 +88,23 @@ for (const [kind, bytes] of Object.entries(files)) {
   }
   check(n > 350 && same / n >= 0.99, `journal messages read from a save fill the same blanks as the build's: ${same}/${n}${differ.length ? ` (differ: ${differ.join(', ')})` : ''}`);
 }
+// The Postman as the player's save had it (2026-10-25): the forged letter in the pack, to leave in the inn. The card
+// names it as the inventory does ("Letter: " and the letter's signature), on the Misc page, in the pack
+{
+  const { compile, start, settle, setTriggered } = await import('./lib/questSim.mjs');
+  const sd = start(compile('A0C00Y00'), 1);
+  settle(sd); setTriggered(sd, '_S.02_'); setTriggered(sd, '_qgclicked_');
+  const r = s => sd.resources.find(x => x.symbol?.original === s);
+  r('_npc3_').resourceSpecific.displayName = 'Lysausa Greenhouse';
+  const letter = { name: 'Parchment', group: 'UselessItems2', templateIndex: 279, questItem: true, questUID: sd.uid, questSymbol: { original: '_falseletter2_', name: 'falseletter2' } };
+  if (r('_falseletter2_')) r('_falseletter2_').resourceSpecific.item = letter;
+  const f = questsInSave({ quest: { machine: { quests: [sd] } }, items: [letter] }, quests, extra).found[0];
+  const v = f?.guide?.[0]?.inv;
+  check(f?.guide?.[0]?.kind === 'drop' && v?.name === 'Letter: Lysausa Greenhouse' && v.where === 'pack' && v.page === 'Misc' && v.tab === 'Clothing & Misc' && v.icon === 'letter',
+    `Postman: the forged letter as the inventory shows it: ${JSON.stringify(v)}`);
+  const gone = questsInSave({ quest: { machine: { quests: [sd] } }, items: [] }, quests, extra).found[0]?.guide?.[0]?.inv;
+  check(gone && gone.where === null && gone.name === 'Letter: Lysausa Greenhouse', `Postman: a letter no longer held says so: ${JSON.stringify(gone)}`);
+}
 let bad = false;
 try { await readSaves(new Blob(['hello'])); } catch { bad = true; }
 check(bad, 'a file that is not a save is refused');

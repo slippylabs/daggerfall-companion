@@ -383,3 +383,12 @@ code { color: var(--gold); }
 .dg-st-tag { margin-left: 4px; }
 .dg-stepchip { min-height: 40px; padding: 0 10px; border: 1px solid var(--ink-soft); background: rgba(255, 245, 215, 0.35); color: var(--ink); font-family: var(--caps); font-size: 0.7rem; letter-spacing: 0.05em; cursor: pointer; border-radius: 3px; }
 .dg-stepchip:hover { border-color: var(--ink-red); color: var(--ink-red); }
+
+/* the item a step needs, as the inventory shows it */
+.dg-inv { margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--gold-dim); border-radius: 6px; background: rgba(201, 162, 39, 0.08); }
+.dg-inv-head { display: flex; align-items: center; gap: 12px; }
+.dg-inv-icon { image-rendering: pixelated; background: #5a4630; padding: 6px; border-radius: 4px; flex: none; }
+.dg-inv-name { font-weight: bold; font-size: 1.05em; }
+.dg-inv-where { opacity: 0.8; font-size: 0.9em; }
+.dg-inv-steps { margin: 8px 0 0; padding-left: 1.4em; }
+.dg-inv-steps li { margin: 3px 0; }

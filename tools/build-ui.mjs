@@ -2,12 +2,14 @@
 //   stone.png        - the chiseled grey stone of the spellbook panel (SPBK00I0)
 //   parchment.png    - the plain middle of the logbook page (LGBK00I0)
 //   scroll-top.png / scroll-bottom.png - the logbook's wooden rollers
+//   item-letter.png  - a quest letter's inventory picture, the Parchment (TEXTURE.209 record 8), for the cards
 import { dfo, arena2, writeOut } from './lib/env.mjs';
 import { encodePng } from './lib/png.mjs';
 
 const { ImgFile } = await dfo('src/formats/imgFile.js');
 const { DFPalette } = await dfo('src/formats/dfPalette.js');
 const { bitmapToColor32 } = await dfo('src/formats/color32Order.js');
+const { TextureFile } = await dfo('src/formats/textureFile.js');
 
 const palette = new DFPalette();
 palette.load(arena2('ART_PAL.COL'), 'ART_PAL.COL');
@@ -34,4 +36,8 @@ writeOut('img/ui/stone.png', crop(spellbook, 8, 16, 104, 120));
 writeOut('img/ui/parchment.png', crop(logbook, 30, 28, 260, 144));
 writeOut('img/ui/scroll-top.png', crop(logbook, 0, 0, 320, 14));
 writeOut('img/ui/scroll-bottom.png', crop(logbook, 0, 0, 320, 14, { flip: true }));
+const tex = new TextureFile();
+tex.load(arena2('TEXTURE.209'), 'TEXTURE.209', palette);
+const letter = tex.getColor32(tex.getDFBitmap(8, 0), 0);
+writeOut('img/ui/item-letter.png', encodePng(letter.width, letter.height, new Uint8Array(letter.colors.buffer, letter.colors.byteOffset, letter.width * letter.height * 4)));
 console.log('ui textures written');

@@ -3,9 +3,9 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=20';
-import { questNow } from './questNow.js?v=20';
-import { parseTemplate, templateSegments } from './questText.js?v=20';
+import { data } from './data.js?v=21';
+import { questNow } from './questNow.js?v=21';
+import { parseTemplate, templateSegments } from './questText.js?v=21';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -92,6 +92,53 @@ function itemName(r, names) {
   if (/gold/i.test(it.name || '') && it.stackCount) return `${it.stackCount} gold`;
   const title = it.message != null && /book|parchment/i.test(it.name || '') ? names?.books?.[it.message & 0xff] : null;
   return title ? `the book "${title}"` : (it.name ? it.name.toLowerCase() : null);
+}
+
+// The pack page an item sits on in DFO's inventory (src/ui/packPages.js pageOf for the enhanced screen's nine pages;
+// the classic screen keeps DFU's four tabs, nativeInventory.js filterByTab)
+const VALUABLES = new Set(['Gems', 'Jewellery', 'Currency', 'Paintings', 'Deeds', 'Artifacts']);
+export function packPage(it) {
+  const g = it?.group, enchanted = (it?.legacyMagic?.length || it?.customMagic?.length) > 0;
+  if (enchanted) return { page: 'Magic', tab: 'Magic' };
+  if (g === 'Weapons') return { page: 'Weapons', tab: 'Weapons & Armor' };
+  if (g === 'Armor') return { page: 'Armor', tab: 'Weapons & Armor' };
+  if (g === 'MensClothing' || g === 'WomensClothing') return { page: 'Clothing', tab: 'Clothing & Misc' };
+  if (g === 'UselessItems1' && /potion/i.test(it.name || '')) return { page: 'Potions', tab: 'Clothing & Misc' };
+  if (VALUABLES.has(g)) return { page: 'Valuables', tab: g === 'Gems' ? 'Ingredients' : 'Clothing & Misc' };
+  if (/Ingredients|MiscellaneousIngredients/.test(g || '')) return { page: 'Ingredients', tab: 'Ingredients' };
+  if (g === 'Books' || g === 'Maps') return { page: 'Books', tab: 'Clothing & Misc' };
+  return { page: 'Misc', tab: 'Clothing & Misc' };
+}
+const isLetter = it => (!it?.group || it.group === 'UselessItems2') && /^parchment$/i.test(it?.name || '');
+// A quest letter's name in the inventory: "Letter: " and the last line of the message it holds, its names filled
+// and its place blanks as "..." (DFU ExpandLetterSignoff, DFO itemInfo.js questLetterName)
+function letterName(sq, q, sym, names, key) {
+  const id = q.resources[sym]?.used;
+  const msg = (sq.messages || []).find(m => m.id === id);
+  if (!msg) return null;
+  const lines = [];
+  for (const l of msg.lines || []) { if (l.trim() === '<--->') break; lines.push(l.replace(/<[a-z]{2}>/gi, '')); }
+  const last = [...lines].reverse().find(l => l.trim());
+  if (!last) return null;
+  const kinds = new Map((sq.resources || []).map(r => [key(r.symbol?.original), r.type]));
+  const parts = parseTemplate(last.trim(), s => { const k = key(s); return k ? { sym: k, kind: kinds.get(k) || q.resources[k]?.kind } : null; });
+  const text = parts.map(p => (p?.s && p.n > 1 ? '...' : templateSegments(q, [p], names, {}).map(x => x.text).join(''))).join('').replace(/\s+/g, ' ').trim();
+  return text ? `Letter: ${text}` : null;
+}
+// A quest item as the player finds it in the inventory: its name there, its page, where it is kept, a picture
+function inInventory(sq, q, snap, sym, names, key) {
+  const where = [['items', 'pack'], ['wagonItems', 'wagon'], ['bagItems', 'materials bag'], ['otherItems', 'repairer']];
+  let held = null, place = null;
+  for (const [k, w] of where) {
+    held = (snap[k] || []).find(it => it?.questItem && it.questUID === sq.uid && key(it.questSymbol?.original || `_${it.questSymbol?.name}_`) === sym);
+    if (held) { place = w; break; }
+  }
+  const r = (sq.resources || []).find(x => key(x.symbol?.original) === sym);
+  const it = held || r?.resourceSpecific?.item;
+  if (!it) return null;
+  const letter = isLetter(it);
+  const name = (letter && letterName(sq, q, sym, names, key)) || it.shortName || it.name || null;
+  return { name, where: place, worn: held?.equipSlot != null && held.equipSlot >= 0, ...packPage(it), icon: letter ? 'letter' : null };
 }
 
 // Every open objective of a save's quest, resolved to an exact target: who/what, the town (location index),
@@ -271,6 +318,13 @@ export function questsInSave(snap, quests, extra = {}) {
     const daysLeft = clocks[q.timer] ?? (Object.keys(clocks).length ? Math.min(...Object.values(clocks)) : null);
     let guide = null;
     try { guide = guideFor(sq, snap, extra); } catch (e) { console.warn('guide', sq.questName, e); }
+    // the item a step needs, as the inventory shows it
+    for (const o of guide || []) {
+      const k = key(o.syms?.item);
+      if (k && ['drop', 'bring', 'use'].includes(o.kind)) {
+        try { o.inv = inInventory(sq, q, snap, k, names, key); } catch (e) { console.warn('inv', sq.questName, e); }
+      }
+    }
     const journal = journalOf(sq, q, { names, days, locs, buildings, key });
     let debug = null;
     try { debug = questDebug(sq, snap); } catch (e) { debug = { error: e.message }; }

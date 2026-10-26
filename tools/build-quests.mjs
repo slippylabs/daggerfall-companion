@@ -78,7 +78,9 @@ function describeItem(line) {
     return { role: r ? `${r[1]}-${r[2]} gold` : 'gold', gold: true };
   }
   const name = rest.replace(/\b(range|anyInfo|rumors|used)\b.*$/, '').trim().replace(/\d+$/, '').split(/\s+/)[0];
-  return { role: ITEMS[name] || article(words(name).toLowerCase()) };
+  // "letter used 1016": the message the letter holds (the game names a quest letter by its last line)
+  const used = rest.match(/\bused\s+(\d+)/);
+  return { role: ITEMS[name] || article(words(name).toLowerCase()), ...(used ? { used: +used[1] } : {}) };
 }
 
 function describeFoe(line) {
