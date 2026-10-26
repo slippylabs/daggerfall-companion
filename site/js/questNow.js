@@ -14,10 +14,11 @@
 //   answer: 'yes' when the target asks a question;
 //   later: its target is not in the world yet (an earlier objective puts it there).
 //   fromJournal: the place is the one the journal's latest entry names (the script gives none);
-//   journal: that place (journalPlace), for a guide to show beside NOW.
+//   journal: that place (journalPlace), for a guide to show beside NOW;
+//   avoid: player actions that would spoil the quest ([{kind, item|foe|npc}]: don't pick up the wand).
 //   items: the player's quest items, [{questUID, symbol}] (from the save's inventories)
 
-import { parseTemplate } from './questText.js?v=18';
+import { parseTemplate } from './questText.js?v=19';
 
 const sym = s => (s && typeof s === 'object' ? s.original : s) || null;
 
@@ -303,10 +304,19 @@ export function questNow(sq, items = []) {
     objectives.push(o);
   });
   if (rewardObj) objectives.push(rewardObj);
-  if (!objectives.length && pays) objectives.push({ kind: 'reward', automatic: true });
+  // nobody to collect from: the reward comes by itself the moment the last step is done (said, as the step after)
+  if (pays && !objectives.some(o => o.kind === 'reward' || o.payer)) objectives.push({ kind: 'reward', automatic: true });
+  // what the player must NOT do: the player actions behind what the goal waits on NOT having happened (The Postman's
+  // wand calls the guard; the vampire must be wounded, not killed)
+  const avoid = [];
+  for (const f of forbid) {
+    const t = tasks.get(f);
+    if (!t || t.triggered || timers.has(f)) continue;
+    for (const a of conds(t)) if (PLAYER.has(a.type)) { const o = objective(a); if (o && !avoid.some(v => v.kind === o.kind && (v.item || v.foe || v.npc) === (o.item || o.foe || o.npc))) avoid.push(o); }
+  }
   // a foe that spawns, an item to use or a spell to cast where the script never says: the journal's latest entry
   // names the place (the bats are in the house, the zombies in the graveyard)
   const o0 = objectives[0];
   if (o0 && !o0.place && journal && ['kill', 'use', 'cast', 'pickup', 'drop'].includes(o0.kind)) Object.assign(o0, { place: journal, fromJournal: true });
-  return { objectives, complete: false, goal: sym(goal.symbol), pays, journal };
+  return { objectives, complete: false, goal: sym(goal.symbol), pays, journal, avoid };
 }

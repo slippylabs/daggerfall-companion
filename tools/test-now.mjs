@@ -68,6 +68,16 @@ check((compiled - bad.length) / compiled >= 0.95, `startup NOW with a target for
   check(jt.agree / jt.named >= JOURNAL_AGREE, `NOW goes where the journal's latest entry points: ${jt.agree}/${jt.named} steps`);
 }
 
+// The Postman, as a player's save had it (2026-10-25): the true letter delivered, the forged one still to leave in
+// the inn. NOW the drop, THEN the reward that comes by itself; and never the wand, which calls the guard
+{
+  const sd = start(compile('A0C00Y00'), 1);   // pick 1: _letter2_ (the forged letter _falseletter2_)
+  settle(sd); setTriggered(sd, '_S.02_'); setTriggered(sd, '_qgclicked_');
+  const r = questNow(sd, heldItems(sd)), [a, b] = r.objectives;
+  check(a?.kind === 'drop' && a.item === '_falseletter2_' && a.place === '_inn_' && b?.kind === 'reward' && b.automatic
+    && r.avoid?.length === 1 && r.avoid[0].kind === 'pickup' && r.avoid[0].item === '_treasure_',
+    `Postman, letter delivered: ${show(a)} at ${a?.place}, then ${b?.automatic ? 'the reward by itself' : show(b)}; don't ${r.avoid?.map(show).join(', ')}`);
+}
 // The Delivery Boy: the package is handed over at the start; deliver it, the recipient pays
 {
   const sd = start(compile('A0C00Y14'));

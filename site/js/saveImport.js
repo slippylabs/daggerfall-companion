@@ -3,9 +3,9 @@
 // is uploaded. The save holds DFU's QuestMachine data: each quest's file name, the people's names and the
 // places the game picked (with their map ids), and the clocks' remaining seconds (DFO save.js snapshotPlayer
 // -> questBridge.snapshot -> QuestMachine/Quest/Person/Place/Clock getSaveData).
-import { data } from './data.js?v=18';
-import { questNow } from './questNow.js?v=18';
-import { parseTemplate, templateSegments } from './questText.js?v=18';
+import { data } from './data.js?v=19';
+import { questNow } from './questNow.js?v=19';
+import { parseTemplate, templateSegments } from './questText.js?v=19';
 
 // ---- zip (stored, as DFO writes it, or deflated by any other zipper) ----
 export async function readZip(buf) {
@@ -100,7 +100,7 @@ export function guideFor(sq, snap, extra = {}) {
   const byMapId = guideFor.byMapId ||= (() => { const m = new Map(); data.locs.mapId.forEach((id, i) => { if (!m.has(id)) m.set(id, i); }); return m; })();
   const res = new Map((sq.resources || []).map(r => [r.symbol?.original, r]));
   const site = s => res.get(s)?.resourceSpecific?.siteDetails || null;
-  const { objectives } = questNow(sq, questItems(snap));
+  const { objectives, avoid = [] } = questNow(sq, questItems(snap));
   const markerFor = (sd, target) => {
     for (const m of [sd?.selectedMarker, ...(sd?.questSpawnMarkers || []), ...(sd?.questItemMarkers || [])])
       if (m?.flatPosition && (m.targetResources || []).some(t => (t?.original ?? `_${t?.name}_`) === target))
@@ -125,7 +125,11 @@ export function guideFor(sq, snap, extra = {}) {
     }
     return { who: p.displayName || null, ...where };
   };
-  return objectives.map(o => {
+  // the things not to do, named as the player sees them (kept on the first objective, so a stored guide keeps them)
+  const avoidWords = avoid.map(v => v.item ? { kind: v.kind, item: itemName(res.get(v.item), extra.names) }
+    : v.foe ? { kind: v.kind, who: res.get(v.foe)?.resourceSpecific?.typeName || null, injure: !!v.injure }
+      : { kind: v.kind, who: res.get(v.npc)?.resourceSpecific?.displayName || null });
+  const out = objectives.map(o => {
     const base = { kind: o.kind, later: !!o.later, payer: !!o.payer, answer: o.answer || null, injure: !!o.injure, count: o.count || 1, automatic: !!o.automatic,
       hours: o.hours || null, fromJournal: !!o.fromJournal,
       // the quest's own symbols, so the walkthrough's steps can be matched to where the player is
@@ -149,6 +153,8 @@ export function guideFor(sq, snap, extra = {}) {
       default: return base;
     }
   });
+  if (out[0] && avoidWords.length) out[0].avoid = avoidWords;
+  return out;
 }
 
 // A quest's state in short, for a bug report (the card's "Copy for help"): what the guide decided and from what -

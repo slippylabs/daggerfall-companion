@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=18';
-import { el, fill } from './ui.js?v=18';
-import { state, onChange, showOnMap, setHere } from './state.js?v=18';
-import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=18';
-import { showQuest } from './quests.js?v=18';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=18';
-import { planRoute } from './route.js?v=18';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=18';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=19';
+import { el, fill } from './ui.js?v=19';
+import { state, onChange, showOnMap, setHere } from './state.js?v=19';
+import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=19';
+import { showQuest } from './quests.js?v=19';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=19';
+import { planRoute } from './route.js?v=19';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=19';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -172,17 +172,19 @@ function sayAction(o, q) {
   switch (o.kind) {
     case 'talk': return `Talk to ${who}${o.answer === 'yes' ? ' and answer Yes' : ''}`;
     case 'reward': return o.automatic ? 'Your reward comes the moment the job is done' : `Collect your reward from ${who}`;
-    case 'bring': return `Give ${o.item || 'the quest item'} to ${who}${o.payer ? ', who pays your reward' : ''}`;
+    case 'bring': return `Give ${thing(o.item)} to ${who}${o.payer ? ', who pays your reward' : ''}`;
     case 'kill': return o.injure ? `Wound the ${o.who || 'foe'}, but do not kill it` : `Kill ${o.count > 1 ? plural(o.count, o.who || 'foe') : `the ${o.who || 'foe'}`}`;
-    case 'pickup': return `Pick up ${o.item || 'the quest item'}`;
-    case 'drop': return `Drop ${o.item || 'the quest item'} here (inventory → drop)`;
-    case 'use': return `Use ${o.item || 'the quest item'} from your inventory`;
+    case 'pickup': return `Pick up ${thing(o.item)}`;
+    case 'drop': return `Go inside${o.building ? ` ${o.building.name}` : ''} and drop ${thing(o.item)} there: open your inventory and move it from your pack onto the ground (not the wagon), then leave it. It only counts inside`;
+    case 'use': return `Use ${thing(o.item)} from your inventory`;
     case 'cast': return `Cast the spell ${o.spell}`;
     case 'go': return o.hours ? `Go there between ${clockTime(o.hours[0])} and ${clockTime(o.hours[1])} (game time): the quest only watches then` : 'Go there';
     case 'wait': return `Wait for the time to run out${o.days ? ` (about ${plural(o.days, 'day')})` : ''}: the quest goes on by itself then`;
     default: return '';
   }
 }
+// an item as a thing in a sentence: "the parchment", but "the book "...", "50 gold" and an artifact's own name as they are
+const thing = n => (!n ? 'the quest item' : /^(the|a|an)\s|^\d/i.test(n) || /^[A-Z]/.test(n) ? n : `the ${n}`);
 const clockTime = sec => `${String(Math.floor(sec / 3600) % 24).padStart(2, '0')}:${String(Math.floor(sec / 60) % 60).padStart(2, '0')}`;
 // the journal's latest entry (the save's log steps, by the time written)
 const latestJournal = entry => [...(entry.journal || [])].sort((a, b) => b.time - a.time)[0] || null;
@@ -236,6 +238,13 @@ function signpost(o) {
   if (o.dungeon || o.spot) return { town, place: o.spot ? 'the marked spot inside' : null, part: o.dungeon ? 'dungeon' : null };
   return { town, place: null, part: null };
 }
+// the things not to do (questNow avoid): a line of its own under NOW
+function avoidLine(list) {
+  if (!list?.length) return null;
+  const say = v => v.kind === 'pickup' ? `pick up ${thing(v.item)}` : v.kind === 'kill' ? (v.injure ? `wound ${v.who ? `the ${v.who}` : 'the foe'}` : `kill ${v.who ? `the ${v.who}` : 'the foe'}`)
+    : v.kind === 'bring' ? `give ${thing(v.item)} to ${v.who || 'them'}` : v.kind === 'drop' ? `drop ${thing(v.item)}` : `talk to ${v.who || 'them'}`;
+  return el('div', { class: 'dg-avoid' }, el('span', { class: 'dg-avoid-label', text: "Don't " }), list.map(say).join(', or ') + ': it spoils the quest.');
+}
 function nowBlock(o, q) {
   const sp = signpost(o);
   const trip = o.loc != null && state.here >= 0 && o.loc !== state.here ? travelBetween(state.here, o.loc, state.opts) : null;
@@ -278,7 +287,7 @@ function nowCard(q, entry) {
     ? (jp?.loc != null
       ? nowBlock({ kind: 'go', loc: jp.loc, building: jp.building ? { key: jp.building.key, name: jp.building.name } : null, fromJournal: true }, q)
       : el('div', { class: 'dg-step-block dg-step-now' }, el('div', { class: 'dg-step-what', text: j ? 'Nothing the guide can point to: follow your journal.' : 'Nothing the guide can point to. Check the quest in your journal, or open details.' })))
-    : [nowBlock(g[0], q), journalNote(j, g[0]), g[1] ? thenLine(g[1], q) : null];
+    : [nowBlock(g[0], q), avoidLine(g[0].avoid), journalNote(j, g[0]), g[1] ? thenLine(g[1], q) : null];
   const older = (entry.journal || []).filter(e => e !== j);
   // a quest that just arrived from the game glows for a couple of minutes
   const fresh = entry.fresh && Date.now() - entry.fresh < 120000 && list.length > 1;
