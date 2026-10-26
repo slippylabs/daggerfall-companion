@@ -1,12 +1,12 @@
 // Entry point: load the data, wire the shared "I am in" header and the tabs.
-import { data, loadCore, regionName, typeWord } from './data.js?v=21';
-import { state, setHere, setOpts, onChange, registerTabs } from './state.js?v=21';
-import { autocomplete } from './ui.js?v=21';
-import { initMap } from './map.js?v=21';
-import { initJournal } from './journal.js?v=21';
-import { initQuests, setQuestTabs } from './quests.js?v=21';
-import { initTowns, townsShown } from './towns.js?v=21';
-import { initMyQuests, renderMine, loadSnapshot, hasQuests } from './myquests.js?v=21';
+import { data, loadCore, regionName, typeWord } from './data.js?v=22';
+import { state, setHere, setOpts, onChange, registerTabs } from './state.js?v=22';
+import { autocomplete } from './ui.js?v=22';
+import { initMap } from './map.js?v=22';
+import { initJournal } from './journal.js?v=22';
+import { initQuests, setQuestTabs } from './quests.js?v=22';
+import { initTowns, townsShown } from './towns.js?v=22';
+import { initMyQuests, renderMine, loadSnapshot, hasQuests, helperPayload } from './myquests.js?v=22';
 
 const $ = id => document.getElementById(id);
 const TABS = ['journal', 'map', 'quests', 'towns', 'mine'];
@@ -43,7 +43,10 @@ function startSync() {
   say('Waiting for DFO Online to send your quests…');
   // the bookmark keeps watching and sends a fresh copy whenever the save changes: every one is taken
   let done = false, first = true, busy = Promise.resolve();
+  // the in-game helper (js/helper.js on DFO's page) is sent each quest's step after every sync, and when it asks
+  const tellHelper = async (to, origin) => { try { to?.postMessage({ type: 'dg-helper', quests: await helperPayload(), at: Date.now() }, origin); } catch { /* the game tab closed */ } };
   addEventListener('message', e => {
+    if (allowed.has(e.origin) && e.data === 'dg-helper-hello') { busy = busy.then(() => tellHelper(e.source, e.origin)); return; }
     if (!allowed.has(e.origin) || e.data?.type !== 'dg-sync') return;
     done = true;
     const p = e.data.payload || {};
@@ -53,6 +56,7 @@ function startSync() {
         // the first copy opens My quests; later ones update it quietly, wherever the player is looking
         const n = await loadSnapshot(p.snap, p.info || null, first ? 'sync' : 'live');
         first = false;
+        await tellHelper(e.source, e.origin);
         const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         say(`● Live: updated ${t} (${n} quest${n === 1 ? '' : 's'}). This page follows your game while DFO Online stays open.`, 'dg-good dg-live');
       } catch (err) { say(`Could not read the quests: ${err.message}`, 'dg-bad'); }

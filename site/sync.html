@@ -34,7 +34,9 @@
         <li>Have DFO Online open on <b>daggerfalljs.dev</b>, logged in.</li>
         <li>Click <b>⚔ Sync quests</b> on your bookmarks bar.</li>
         <li>The guide opens (or comes to the front) on <b>My quests</b>, with each quest's next step.</li>
+        <li>A <b>quest helper</b> panel appears over the game with what to do now. With your inventory open, the tile the quest needs <b>glows gold</b>. Drag the panel by its title; × hides it, and the bookmark brings it back. Keep the guide's tab open: it sends the steps.</li>
       </ol>
+      <p class="dg-dim"><b>Had the bookmark before 26 October 2026?</b> Drag it to your bookmarks bar again (and delete the old one) to get the quest helper.</p>
       <p class="dg-dim">Your online character's save is read from DFO's own account service, on DFO's page: your login never leaves daggerfalljs.dev and nothing is stored on this site's server; the guide keeps your quests in this browser only. DFO saves an online character every few minutes and when you switch tabs, so a sync shows your progress up to then. Playing offline? Save (F9) first.</p>
       <p class="dg-dim">If your browser blocks the window, allow pop-ups for daggerfalljs.dev.</p>
     </div>
@@ -43,7 +45,7 @@
 </main>
 <script type="module">
 // The bookmark is js/bookmarklet.js itself, as a javascript: link (whole-line comments dropped)
-const src = await (await fetch('js/bookmarklet.js?v=21')).text();
+const src = await (await fetch('js/bookmarklet.js?v=22')).text();
 const code = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
 const a = document.getElementById('bookmarklet');
 a.href = 'javascript:' + encodeURIComponent(code);

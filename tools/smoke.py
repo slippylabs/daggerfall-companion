@@ -428,11 +428,58 @@ def run_sync(base):
         browser.close()
 
 
+POSTMAN = (Path(__file__).resolve().parent / 'fixtures' / 'postman-save.json').read_text()
+FAKE_PACK = """(page) => { document.querySelector('.pack-shell')?.remove(); const d = document.createElement('div'); d.className = 'pack-shell';
+  const tabs = ['Weapons', 'Misc'].map(t => `<button class="packtab${t === page ? ' on' : ''}">${t}<span class="count">4</span></button>`).join('');
+  const rows = page !== 'Misc' ? '<button class="itemrow"><span class="itemname"><span>Dagger</span></span></button>'
+    : ['Parchment', 'Parchment', 'Letter: Lysausa Greenhouse ', 'Parchment'].map(n => `<button class="itemrow"><span class="itemname"><span>${n}</span></span></button>`).join('');
+  d.innerHTML = `<section class="packcats"><div class="packtabs">${tabs}</div></section><section class="packcol">${rows}</section>`; document.body.append(d); }"""
+
+
+def run_helper(base):
+    """The in-game helper: the bookmark loads js/helper.js into DFO's page; the guide sends it the Postman's step; with
+    the pack open it lights the Misc button, then only the quest letter among identical parchments."""
+    dfo = serve_fake_dfo()
+    guide = f'{base}?dfo={dfo}'
+    code = (SITE / 'js' / 'bookmarklet.js').read_text()
+    code = code.replace("GUIDE = 'https://daggerfall.slippylabs.com/'", f"GUIDE = {guide!r}").replace(r"DFO_HOST = /(^|\.)daggerfalljs\.dev$/", r"DFO_HOST = /^127\.0\.0\.1$/")
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        ctx = browser.new_context(viewport={'width': 1280, 'height': 900})
+        page = ctx.new_page()
+        page.goto(dfo + '/')
+        page.evaluate("([s]) => { localStorage.setItem('dagger.save.0', s); localStorage.setItem('dagger.saveinfo.0', JSON.stringify({characterName: 'Slippy', saveName: 'QuickSave', dateAndTime: {realTime: 5, gameTime: 523530}})); }", [POSTMAN])
+        with page.expect_popup():
+            page.evaluate(code)
+        page.wait_for_function('window.__dgHelper && window.__dgHelper.state().quests.length === 1', timeout=20000)
+        panel = page.locator('#dg-helper .p').inner_text()
+        check('The Postman' in panel and 'Letter: Lysausa Greenhouse' in panel and "The Queen's Helm" in panel and 'F6' in panel,
+              f'[helper] the panel shows the Postman step over the game ({panel.splitlines()[1][:60]})')
+        page.evaluate(FAKE_PACK, 'Weapons')
+        page.wait_for_function("document.querySelectorAll('.packtab.dg-hl').length === 1")
+        check(page.inner_text('.packtab.dg-hl').startswith('Misc') and 'glowing Misc button' in page.locator('#dg-helper .p').inner_text(),
+              '[helper] pack open on another page: the Misc button glows')
+        page.evaluate(FAKE_PACK, 'Misc')
+        page.wait_for_function("document.querySelectorAll('.itemrow.dg-hl').length === 1")
+        lit = page.evaluate("[...document.querySelectorAll('.itemrow')].map(r => r.classList.contains('dg-hl'))")
+        check(lit == [False, False, True, False] and page.locator('.packtab.dg-hl').count() == 0 and 'glowing gold' in page.locator('#dg-helper .p').inner_text(),
+              f'[helper] on Misc: only the quest letter glows among identical parchments ({lit})')
+        page.screenshot(path=str(SHOTS / 'helper.png'))
+        page.locator('#dg-helper .x').click()
+        check(not page.locator('#dg-helper').is_visible(), '[helper] × closes the panel')
+        page.evaluate(code)   # the second click: the same guide window, no popup
+        page.wait_for_timeout(500)
+        check(page.locator('#dg-helper').is_visible() and page.evaluate("document.querySelectorAll('#dg-helper').length") == 1,
+              '[helper] the bookmark brings it back, one panel only')
+        browser.close()
+
+
 local = not (len(sys.argv) > 1 and sys.argv[1].startswith('http'))
 base = serve() if local else sys.argv[1]
 run(base, 1280, 900, False)
 run(base, 390, 844, True)
 if local:
     run_sync(base)
+    run_helper(base)
 print(f'\n{sum(results)} passed, {len(results) - sum(results)} failed')
 sys.exit(0 if all(results) else 1)

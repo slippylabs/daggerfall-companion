@@ -1,10 +1,10 @@
 // Towns tab: every building of a town, grouped by type, on a north-up sketch of its blocks.
-import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=21';
-import { el, fill, autocomplete, travelLine } from './ui.js?v=21';
-import { state } from './state.js?v=21';
-import { showDungeon, dungeonBlocks } from './dungeon.js?v=21';
-import { townMap } from './townmap.js?v=21';
-import { TOWN_COLOURS, GROUP_OF_BYTE } from './townBytes.js?v=21';
+import { data, loadTowns, regionName, typeWord, normalise } from './data.js?v=22';
+import { el, fill, autocomplete, travelLine } from './ui.js?v=22';
+import { state } from './state.js?v=22';
+import { showDungeon, dungeonBlocks } from './dungeon.js?v=22';
+import { townMap } from './townmap.js?v=22';
+import { TOWN_COLOURS, GROUP_OF_BYTE } from './townBytes.js?v=22';
 
 const $ = id => document.getElementById(id);
 const BLOCK = 102.4;   // one RMB block is 4096 Daggerfall units = 102.4 m

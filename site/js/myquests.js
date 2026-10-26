@@ -1,14 +1,14 @@
 // My quests tab: the quests the player is on, kept in this browser. Each entry is a quest file plus the
 // names, places and days read from the player's journal (recognise.js), so it can say who pays and
 // how far everything is from wherever the player stands now.
-import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=21';
-import { el, fill } from './ui.js?v=21';
-import { state, onChange, showOnMap, setHere } from './state.js?v=21';
-import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=21';
-import { showQuest } from './quests.js?v=21';
-import { openTown, buildingAt, whereInTown } from './towns.js?v=21';
-import { planRoute } from './route.js?v=21';
-import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=21';
+import { data, loadQuests, locationsNamed, travelBetween, formatDuration, regionName, loadTowns, loadNames, loadIndividuals } from './data.js?v=22';
+import { el, fill } from './ui.js?v=22';
+import { state, onChange, showOnMap, setHere } from './state.js?v=22';
+import { rewardGivers, nameFor, stepText, questProgress } from './questText.js?v=22';
+import { showQuest } from './quests.js?v=22';
+import { openTown, buildingAt, whereInTown } from './towns.js?v=22';
+import { planRoute } from './route.js?v=22';
+import { readSaves, questsInSave, saveLabel, whereSaved } from './saveImport.js?v=22';
 
 const $ = id => document.getElementById(id);
 const KEY = 'dg-myquests';
@@ -239,25 +239,71 @@ function signpost(o) {
   return { town, place: null, part: null };
 }
 // the item a step needs, as the inventory shows it: its picture, its name, its page, and the clicks for the step
-function invBox(o) {
+function itemSteps(o, glow = false) {
   const v = o.inv;
   if (!v?.name || !['drop', 'bring', 'use'].includes(o.kind)) return null;
   const kept = v.where === 'pack' || !v.where ? 'your pack' : `your ${v.where}`;
-  const find = `Click the ${v.page} button (classic screen: the ${v.tab} tab), then click the tile named “${v.name}”${v.icon === 'letter' ? ', a flat brown sheet of paper' : ''}. The pack shows pictures only: the name appears when you click one`;
-  const steps = !v.where ? [`You don't have it any more. ${o.kind === 'drop' ? 'Look on the floor where you dropped it, or' : 'Check'} the step before this one`]
+  const find = glow ? `Click the ${v.page} button, then the tile glowing gold` : `Click the ${v.page} button (classic screen: the ${v.tab} tab), then click the tile named “${v.name}”${v.icon === 'letter' ? ', a flat brown sheet of paper' : ''}. The pack shows pictures only: the name appears when you click one`;
+  return !v.where ? [`You don't have it any more. ${o.kind === 'drop' ? 'Look on the floor where you dropped it, or' : 'Check'} the step before this one`]
     : [
       ...(v.where !== 'pack' ? [`It is in ${kept}: move it into your pack first`] : []),
       ...(o.kind === 'drop' ? [`Walk inside ${o.building?.name || 'the place'}`] : o.kind === 'bring' ? [`Find ${o.who || 'them'} and click them while you carry it`] : []),
       ...(o.kind === 'bring' ? [] : ['Open your inventory (F6)', find]),
-      ...(o.kind === 'drop' ? ['Drag the tile out of the inventory window and let go: it lands on the floor', 'Close the inventory and leave it there. Do not pick it back up']
+      ...(o.kind === 'drop' ? (glow ? ['Drag that tile out of the inventory window and let go', 'Leave it on the floor'] : ['Drag the tile out of the inventory window and let go: it lands on the floor', 'Close the inventory and leave it there. Do not pick it back up'])
         : o.kind === 'use' ? ['Click Use'] : []),
     ];
+}
+function invBox(o) {
+  const v = o.inv, steps = itemSteps(o);
+  if (!steps) return null;
+  const kept = v.where === 'pack' || !v.where ? 'your pack' : `your ${v.where}`;
   return el('div', { class: 'dg-inv' },
     el('div', { class: 'dg-inv-head' },
       v.icon === 'letter' ? el('img', { class: 'dg-inv-icon', src: 'img/ui/item-letter.png', alt: '', width: 122, height: 38 }) : null,
       el('div', {}, el('div', { class: 'dg-inv-name', text: v.name }),
         el('div', { class: 'dg-inv-where', text: v.where ? `In ${kept} · ${v.page} page (classic: ${v.tab})${v.worn ? ' · worn' : ''}` : 'Not in your inventory' }))),
     el('ol', { class: 'dg-inv-steps' }, steps.map(t => el('li', { text: t + '.' }))));
+}
+// ---- the in-game helper (js/helper.js, loaded into DFO's page by the Sync bookmark): each quest's step, short ----
+// the clicks for a step, for the helper's checklist
+function helperSteps(o) {
+  const item = itemSteps(o, true);
+  if (item) return item;
+  const sp = signpost(o);
+  const go = sp ? `Go to ${[sp.town, sp.place].filter(Boolean).join(' › ')}${sp.part && sp.part !== 'dungeon' ? ` (${sp.part})` : sp.part === 'dungeon' ? ' (a dungeon)' : ''}` : null;
+  const who = o.who || 'them';
+  switch (o.kind) {
+    case 'talk': return [go, `Click ${who} to talk`, o.answer === 'yes' ? 'When asked, answer Yes' : null].filter(Boolean);
+    case 'reward': return o.automatic ? ['Nothing to do: the reward comes by itself'] : [go, `Click ${who} to collect your reward`].filter(Boolean);
+    case 'kill': return [go, o.spot ? 'The guide\'s Dungeon map shows the exact spot' : null, sayAction(o)].filter(Boolean);
+    case 'pickup': return [go, o.spot ? 'The guide\'s Dungeon map shows the exact spot' : null, `Find ${thing(o.item)} and click it to pick it up`].filter(Boolean);
+    case 'go': return [go, o.hours ? `Be there between ${clockTime(o.hours[0])} and ${clockTime(o.hours[1])} (game time)` : null].filter(Boolean);
+    default: return [go, sayAction(o)].filter(Boolean);
+  }
+}
+const avoidText = list => !list?.length ? null : list.map(v => v.kind === 'pickup' ? `pick up ${thing(v.item)}` : v.kind === 'kill' ? (v.injure ? `wound ${v.who ? `the ${v.who}` : 'the foe'}` : `kill ${v.who ? `the ${v.who}` : 'the foe'}`)
+  : v.kind === 'bring' ? `give ${thing(v.item)} to ${v.who || 'them'}` : v.kind === 'drop' ? `drop ${thing(v.item)}` : `talk to ${v.who || 'them'}`).join(', or ');
+// every synced quest as the helper shows it: the step in one line, where, the clicks, what not to do, and the names
+// of the inventory tiles to light up (the quest's item, and its pack page)
+export async function helperPayload() {
+  const byFile = new Map((await loadQuests()).map(q => [q.file, q]));
+  return list.filter(e => e.guide && byFile.has(e.file)).map(entry => {
+    const q = byFile.get(entry.file), g = entry.guide, o = g[0], pr = questProgress(q, g);
+    const j = latestJournal(entry);
+    const sp = o ? signpost(o) : j?.lastPlace?.loc != null ? { town: data.locs.name[j.lastPlace.loc], place: j.lastPlace.building?.name || null } : null;
+    const tile = o?.inv?.where && ['drop', 'use'].includes(o.kind) ? o.inv : null;
+    return {
+      file: entry.file, title: q.title || q.file, daysLeft: entry.daysLeft ?? null, step: [pr.step, pr.total],
+      now: !o ? 'Follow your journal: the guide cannot tell the next step'
+        : o.kind === 'drop' && o.inv?.name ? `Drop “${o.inv.name}” inside ${o.building?.name || 'the place'}` : sayAction(o),
+      where: sp ? [sp.town, sp.place].filter(Boolean).join(' › ') : null,
+      steps: o ? helperSteps(o) : [],
+      avoid: o ? avoidText(o.avoid) : null,
+      then: g[1] ? sayAction(g[1]) : null,
+      journal: j?.text || null,
+      tiles: tile ? [tile.name] : [], page: tile?.page || null,
+    };
+  });
 }
 // the things not to do (questNow avoid): a line of its own under NOW
 function avoidLine(list) {

@@ -13,6 +13,15 @@
     return;
   }
   const origin = new URL(GUIDE).origin;
+  // the in-game helper: a panel with each quest's step, and a glow on the inventory tile the step needs (js/helper.js,
+  // fetched fresh each hour so a fix reaches the player without a new bookmark)
+  if (window.__dgHelper) window.__dgHelper.show();
+  else {
+    const s = document.createElement('script');
+    s.charset = 'utf-8';
+    s.src = new URL('js/helper.js', GUIDE).href + '?h=' + Math.floor(Date.now() / 36e5);
+    document.head.append(s);
+  }
   const w = window.open(GUIDE + '#sync', 'dg-guide');
   if (!w) { alert('Your browser blocked the guide window. Allow pop-ups for daggerfalljs.dev and click again.'); return; }
   // a second click while a watcher runs: it sends again to the (re)opened window, no second watcher
