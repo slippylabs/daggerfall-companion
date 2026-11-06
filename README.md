@@ -1,5 +1,9 @@
 # Daggerfall Quest Guide
 
+> **ARCHIVED 2026-11-06.** No longer in use. daggerfall.slippylabs.com now 301-redirects to
+> https://projects.slippylabs.com/. The last served docroot is in `~/archive/daggerfall-docroot-2026-11-06.tar.gz`
+> and its vhost in `~/archive/daggerfall.slippylabs.conf.served-2026-11-06`.
+
 https://daggerfall.slippylabs.com/
 
 A companion site for DFO Online (https://daggerfalljs.dev/) and Daggerfall. The game keeps your
